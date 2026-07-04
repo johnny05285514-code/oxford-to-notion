@@ -1,44 +1,68 @@
-# Oxford Learner's Dictionaries → Notion CLI
+# Oxford to Notion
 
-A small Python CLI tool for personal vocabulary study.
+一个输入英文单词，自动查询 Oxford Learner's Dictionaries，并保存到 Notion 单词库的小工具。
 
-Enter one English word, fetch the corresponding Oxford Learner's Dictionaries entry, parse the useful learning fields, and create or update a page in your Notion vocabulary database.
+A small Python CLI tool that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
 ```powershell
 python main.py brutality
 ```
 
-If the same `Word` already exists in Notion, the tool updates the existing page instead of creating a duplicate.
+## 我为什么做这个
 
-## What it extracts
+我学英语时经常查单词，但每次都要手动复制词性、释义和例句到 Notion，过程很重复。
 
-- Word
-- Part of speech
-- Countability, for example `[uncountable]` or `[countable]`
-- Plural form, when available
-- Numbered definitions
-- Example sentences for each definition
-- Source URL
+所以我做了这个小工具：输入一个英文单词，它会自动查询 Oxford Learner's Dictionaries，把适合学习的内容整理好，再保存到我的 Notion 单词库里。
 
-## Important usage note
+这个项目主要是个人低频学习用途。对我来说，它也是一次把真实重复需求变成 Python 自动化程序的练习。
 
-This project is intended for personal, low-frequency learning use.
+## 适合谁
 
-It is not an official Oxford API client, and it is not affiliated with Oxford University Press, Oxford Learner's Dictionaries, or Notion. It uses normal HTTP requests and HTML parsing. Do not use it for bulk scraping, commercial redistribution, bypassing access controls, or high-frequency automated requests.
+适合：
 
-If Oxford returns a JavaScript, cookie, CAPTCHA, or access challenge page, the program stops and reports an error. It does not try to bypass those controls.
+- 想把英文单词整理到 Notion 的人
+- 有一点 Python / 命令行基础的人
+- 愿意跟着步骤配置 Notion Integration 的人
 
-The tool does not save full HTML pages. It only stores the selected vocabulary-learning fields.
+不太适合：
 
-## Requirements
+- 完全不想碰终端的人
+- 想批量抓取大量单词的人
+- 想把它当成商业词典 API 使用的人
 
-- Python 3.11+
-- Network access to Oxford Learner's Dictionaries and the Notion API
-- A Notion internal integration connected to your target database
+## 它能做什么
 
-## Installation
+输入一个词：
 
-Create and activate a virtual environment:
+```powershell
+python main.py brutality
+```
+
+程序会提取并保存：
+
+- 单词
+- 词性
+- 可数 / 不可数
+- 复数形式，如果页面有
+- 编号释义
+- 每个释义下面的例句
+- Oxford 来源链接
+
+如果同一个 `Word` 已经在 Notion 里存在，程序会更新原来的页面，不会重复创建。
+
+## 快速开始
+
+### 1. 安装 Python
+
+需要 Python 3.11 或更新版本。
+
+### 2. 下载项目
+
+可以用 Git clone，也可以直接在 GitHub 页面点 `Code` → `Download ZIP`。
+
+### 3. 安装依赖
+
+在项目目录里运行：
 
 ```powershell
 python -m venv .venv
@@ -46,19 +70,16 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Dependencies:
+### 4. 配置 Notion
 
-- `requests` for Oxford HTTP requests
-- `beautifulsoup4` for HTML parsing
-- `notion-client` for Notion API writes
-- `python-dotenv` for loading `.env`
-- `pytest` for tests
+你需要：
 
-## Notion database fields
+1. 创建一个 Notion Internal Integration
+2. 复制它的 token
+3. 把 Integration 连接到你的 Notion 数据库
+4. 准备好下面这些数据库字段
 
-Create a Notion database with these exact property names and types:
-
-| Property | Notion type |
+| 字段名 | Notion 类型 |
 |---|---|
 | `Name` | Title |
 | `Word` | Rich text |
@@ -70,103 +91,108 @@ Create a Notion database with these exact property names and types:
 | `Source URL` | URL |
 | `Added Date` | Date |
 
-Your Notion integration must be connected to the database through Notion's `Connections` / sharing settings. It needs permission to read, insert, and update content.
+### 5. 配置 `.env`
 
-The program validates the database schema before writing. If a property is missing or has the wrong type, it prints a user-readable error.
-
-## Configure `.env`
-
-Copy the example file:
+复制示例文件：
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Fill in your own Notion values:
+然后填写你自己的 Notion 配置：
 
 ```dotenv
 NOTION_TOKEN=your_notion_integration_token
 NOTION_DATABASE_ID=your_notion_database_id
 ```
 
-Do not commit or share `.env`.
+不要把 `.env` 上传到 GitHub。里面有你的私人 token。
 
-`.env` is ignored by `.gitignore`; `.env.example` is safe to publish because it contains placeholders only.
-
-## Run
-
-Import one word:
+### 6. 运行
 
 ```powershell
 python main.py brutality
 ```
 
-Expected successful output:
+成功时会看到类似：
 
 ```text
 Imported 'brutality': https://app.notion.com/...
 ```
 
-The argument must be one English word. Letters, hyphens, and English apostrophes are accepted.
+## Windows 双击运行
 
-## Optional Windows launcher
-
-This repository includes:
+项目里有一个：
 
 ```text
 Oxford to Notion.bat
 ```
 
-After installing dependencies and configuring `.env`, you can double-click this batch file on Windows. It keeps asking for words until you enter `q` or press Enter on a blank input.
+配置好 `.env` 和依赖后，Windows 用户可以双击它运行。它会连续让你输入单词；输入 `q` 或直接空回车退出。
 
-## Tests
+## 常见问题
 
-Run the full test suite:
+### 这算爬虫吗？
+
+严格说，它是一个低频网页解析工具：用户输入一个词，程序请求一个 Oxford 页面并提取必要学习字段。
+
+它不适合批量抓取，也不会绕过验证码、Cookie、JavaScript challenge 或访问限制。
+
+### 会不会重复创建同一个单词？
+
+不会。程序会用 Notion 里的 `Word` 字段判断是否已经存在。
+
+如果存在，就更新原页面；如果不存在，才创建新页面。
+
+### 为什么我运行失败？
+
+常见原因：
+
+- `.env` 没配置好
+- Notion Integration 没有连接到数据库
+- Notion 数据库字段名或类型不对
+- 网络访问 Oxford 或 Notion API 失败
+- Oxford 没有这个单词
+- Oxford 返回了访问挑战页面
+
+### 可以分享给别人吗？
+
+可以分享代码，但不要分享你自己的 `.env`。
+
+朋友需要用他们自己的：
+
+```dotenv
+NOTION_TOKEN=their_notion_integration_token
+NOTION_DATABASE_ID=their_notion_database_id
+```
+
+## 测试
+
+运行：
 
 ```powershell
 python -m pytest -q
 ```
 
-The tests use small local HTML fixtures and mocked HTTP/Notion boundaries. They do not call Oxford and do not modify a real Notion database.
+测试不会访问真实 Oxford，也不会修改真实 Notion 数据库。
 
-After configuring `.env`, you can manually test a real word:
-
-```powershell
-python main.py brutality
-```
-
-Run the same command twice to confirm the existing Notion page is updated instead of creating a duplicate.
-
-## Common errors
-
-- `Missing required environment variables`: `.env` is missing `NOTION_TOKEN` or `NOTION_DATABASE_ID`.
-- `schema mismatch`: Notion database fields do not match the expected names or types.
-- `no accessible data source`: the integration is not connected to the database, or the database has no accessible data source.
-- `access challenge` / `refused the request`: Oxford refused the normal HTTP request; the tool will not bypass this.
-- `no entry`: Oxford has no entry for the word.
-- `Notion API request failed`: check your token, database connection, integration permissions, and network.
-
-## Project structure
+## 项目结构
 
 ```text
-main.py             CLI entry point and user-facing errors
-config.py           Environment loading and validation
-models.py           Parsed dictionary-entry data models
-oxford_client.py    Oxford request, retry, and HTTP-status handling
-parser.py           Centralized CSS selectors and HTML parsing
-notion_writer.py    Notion schema validation, page body generation, and upsert
-exceptions.py       User-readable exception types
-tests/              Unit tests and minimal HTML fixtures
+main.py             命令行入口
+config.py           读取 .env 配置
+oxford_client.py    请求 Oxford 页面
+parser.py           解析 HTML
+notion_writer.py    写入或更新 Notion
+models.py           数据结构
+exceptions.py       错误类型
+tests/              测试
 ```
 
-If Oxford changes its page structure, start by updating the `SELECTORS` mapping near the top of `parser.py`, then update or add fixture tests.
+如果 Oxford 页面结构变了，通常优先看 `parser.py`。
 
-## Publishing checklist
+## 注意
 
-Before uploading this project to GitHub:
+This project is not affiliated with Oxford University Press, Oxford Learner's Dictionaries, or Notion.
 
-- Keep `.env` private.
-- Confirm `.env.example` contains placeholders only.
-- Do not upload `.venv/`, `.pytest_cache/`, `__pycache__/`, `.agents/`, `.codex/`, `outputs/`, or `work/`.
-- Rotate your Notion integration token if you have ever pasted it into a public place.
-
+Please use it for personal, low-frequency learning only.
