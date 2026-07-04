@@ -1,5 +1,7 @@
 # Oxford to Notion
 
+Languages: [简体中文](README.md) | [English](README.en.md)
+
 一个输入英文单词，自动查询 Oxford Learner's Dictionaries，并保存到 Notion 单词库的小工具。
 
 A small Python CLI tool that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
