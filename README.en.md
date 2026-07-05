@@ -113,20 +113,40 @@ You need to:
 
 ### 5. Configure `.env`
 
-Copy the example file:
+If you ran `setup.bat`, it creates `.env` for you automatically.
+
+If it was not created automatically, copy the example file manually:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Fill in your own Notion settings:
+Then open `.env` with Notepad:
 
-```dotenv
-NOTION_TOKEN=your_notion_integration_token
-NOTION_DATABASE_ID=your_notion_database_id_or_database_url
+```powershell
+notepad .env
 ```
 
-`NOTION_DATABASE_ID` can be either the raw database ID or the full Notion database page URL.
+Replace the values with your own Notion settings:
+
+```dotenv
+NOTION_TOKEN=your Notion Integration Token
+NOTION_DATABASE_ID=your Notion database URL or ID
+```
+
+Example:
+
+```dotenv
+NOTION_TOKEN=paste_your_notion_integration_token_here
+NOTION_DATABASE_ID=https://www.notion.so/your-workspace/your-database-url
+```
+
+Notes:
+
+- Copy `NOTION_TOKEN` from your Notion Integration page
+- For `NOTION_DATABASE_ID`, copying the full Notion database page URL is recommended
+- The program automatically extracts the database ID from the Notion URL
+- `.env` stays on your own computer
 
 Do not upload `.env` to GitHub. It contains your private token.
 

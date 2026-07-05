@@ -115,20 +115,40 @@ python -m pip install -r requirements.txt
 
 ### 5. 配置 `.env`
 
-复制示例文件：
+如果你运行过 `setup.bat`，它会自动帮你创建 `.env` 文件。
+
+如果没有自动创建，也可以手动复制：
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-然后填写你自己的 Notion 配置：
+然后用记事本打开 `.env`：
 
-```dotenv
-NOTION_TOKEN=your_notion_integration_token
-NOTION_DATABASE_ID=your_notion_database_id_or_database_url
+```powershell
+notepad .env
 ```
 
-`NOTION_DATABASE_ID` 可以直接填数据库 ID，也可以直接粘贴 Notion 数据库页面的完整 URL。
+把里面改成你自己的 Notion 配置：
+
+```dotenv
+NOTION_TOKEN=你的 Notion Integration Token
+NOTION_DATABASE_ID=你的 Notion 数据库链接或 ID
+```
+
+例如：
+
+```dotenv
+NOTION_TOKEN=粘贴你的 Notion Integration Token
+NOTION_DATABASE_ID=https://www.notion.so/your-workspace/your-database-url
+```
+
+说明：
+
+- `NOTION_TOKEN` 从 Notion Integration 页面复制
+- `NOTION_DATABASE_ID` 推荐直接复制 Notion 数据库页面的浏览器地址
+- 程序会自动从 Notion URL 里提取数据库 ID
+- `.env` 只保存在你自己的电脑里
 
 不要把 `.env` 上传到 GitHub。里面有你的私人 token。
 
