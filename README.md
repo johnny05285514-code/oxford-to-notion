@@ -74,6 +74,14 @@ python -m pip install -r requirements.txt
 
 ### 4. 配置 Notion
 
+推荐方式：直接 Duplicate 这个 Notion 模板：
+
+[Oxford to Notion Vocabulary Template](https://impartial-chicken-d5f.notion.site/39362946376780deb3d2f6986fef3c4a?v=39362946376780878dde000c78112f24&source=copy_link)
+
+打开链接后，点击右上角的 `Duplicate`，复制到你自己的 Notion workspace。这样数据库字段会自动准备好。
+
+如果你想自己手动创建数据库，也可以按下面的字段配置。
+
 你需要：
 
 1. 创建一个 Notion Internal Integration

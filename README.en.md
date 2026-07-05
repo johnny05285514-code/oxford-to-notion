@@ -72,6 +72,14 @@ python -m pip install -r requirements.txt
 
 ### 4. Configure Notion
 
+Recommended: duplicate this Notion template:
+
+[Oxford to Notion Vocabulary Template](https://impartial-chicken-d5f.notion.site/39362946376780deb3d2f6986fef3c4a?v=39362946376780878dde000c78112f24&source=copy_link)
+
+Open the link, click `Duplicate` in the top-right corner, and copy it into your own Notion workspace. The required database properties will already be prepared.
+
+If you prefer to create the database manually, use the properties below.
+
 You need to:
 
 1. Create a Notion Internal Integration
