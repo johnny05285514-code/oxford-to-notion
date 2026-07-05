@@ -4,9 +4,7 @@ Languages: [简体中文](README.md) | [English](README.en.md)
 
 A small Python CLI tool that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
-```powershell
-python main.py brutality
-```
+After setup, Windows users can double-click `Oxford to Notion.bat` and type only the word.
 
 ## Why I built this
 
@@ -32,7 +30,13 @@ Not ideal for:
 
 ## What it does
 
-Input one word:
+In the Windows double-click version, you only need to type one word:
+
+```text
+brutality
+```
+
+If you prefer the command line, you can also run:
 
 ```powershell
 python main.py brutality
@@ -127,6 +131,20 @@ NOTION_DATABASE_ID=your_notion_database_id_or_database_url
 Do not upload `.env` to GitHub. It contains your private token.
 
 ### 6. Run
+
+Windows users can double-click:
+
+```text
+Oxford to Notion.bat
+```
+
+Then type only the word:
+
+```text
+brutality
+```
+
+Command-line users can also run:
 
 ```powershell
 python main.py brutality
