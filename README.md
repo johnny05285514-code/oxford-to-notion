@@ -64,7 +64,15 @@ python main.py brutality
 
 ### 3. 安装依赖
 
-在项目目录里运行：
+Windows 用户推荐直接双击：
+
+```text
+setup.bat
+```
+
+它会自动创建 `.venv`、安装依赖，并在没有 `.env` 时从 `.env.example` 复制一份。
+
+如果你更习惯命令行，也可以手动运行：
 
 ```powershell
 python -m venv .venv
@@ -134,13 +142,19 @@ Imported 'brutality': https://app.notion.com/...
 
 ## Windows 双击运行
 
-项目里有一个：
+第一次使用时，先双击：
+
+```text
+setup.bat
+```
+
+配置好 `.env` 后，再双击：
 
 ```text
 Oxford to Notion.bat
 ```
 
-配置好 `.env` 和依赖后，Windows 用户可以双击它运行。它会连续让你输入单词；输入 `q` 或直接空回车退出。
+`Oxford to Notion.bat` 会连续让你输入单词；输入 `q` 或直接空回车退出。
 
 ## 常见问题
 

@@ -62,7 +62,15 @@ You can use Git clone, or click `Code` → `Download ZIP` on GitHub.
 
 ### 3. Install dependencies
 
-Run these commands in the project folder:
+Windows users can simply double-click:
+
+```text
+setup.bat
+```
+
+It creates `.venv`, installs dependencies, and copies `.env.example` to `.env` if `.env` does not exist yet.
+
+If you prefer the command line, you can run:
 
 ```powershell
 python -m venv .venv
@@ -132,13 +140,19 @@ Imported 'brutality': https://app.notion.com/...
 
 ## Windows double-click launcher
 
-This project includes:
+For first-time setup, double-click:
+
+```text
+setup.bat
+```
+
+After configuring `.env`, double-click:
 
 ```text
 Oxford to Notion.bat
 ```
 
-After installing dependencies and configuring `.env`, Windows users can double-click this file. It keeps asking for words until you enter `q` or press Enter on a blank input.
+`Oxford to Notion.bat` keeps asking for words until you enter `q` or press Enter on a blank input.
 
 ## FAQ
 
