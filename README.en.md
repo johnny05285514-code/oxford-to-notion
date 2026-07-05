@@ -111,8 +111,10 @@ Fill in your own Notion settings:
 
 ```dotenv
 NOTION_TOKEN=your_notion_integration_token
-NOTION_DATABASE_ID=your_notion_database_id
+NOTION_DATABASE_ID=your_notion_database_id_or_database_url
 ```
+
+`NOTION_DATABASE_ID` can be either the raw database ID or the full Notion database page URL.
 
 Do not upload `.env` to GitHub. It contains your private token.
 

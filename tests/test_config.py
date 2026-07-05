@@ -14,6 +14,28 @@ def test_settings_reads_required_environment(monkeypatch):
     assert settings.notion_database_id == "test_database_id"
 
 
+def test_settings_accepts_notion_database_url(monkeypatch):
+    monkeypatch.setenv("NOTION_TOKEN", "test_notion_token")
+    monkeypatch.setenv(
+        "NOTION_DATABASE_ID",
+        "https://www.notion.so/workspace/Vocabulary-11111111222233334444555555555555"
+        "?v=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+
+    settings = Settings.from_env(load_file=False)
+
+    assert settings.notion_database_id == "11111111222233334444555555555555"
+
+
+def test_settings_accepts_hyphenated_notion_database_id(monkeypatch):
+    monkeypatch.setenv("NOTION_TOKEN", "test_notion_token")
+    monkeypatch.setenv("NOTION_DATABASE_ID", "11111111-2222-3333-4444-555555555555")
+
+    settings = Settings.from_env(load_file=False)
+
+    assert settings.notion_database_id == "11111111222233334444555555555555"
+
+
 def test_settings_lists_missing_values(monkeypatch):
     monkeypatch.delenv("NOTION_TOKEN", raising=False)
     monkeypatch.delenv("NOTION_DATABASE_ID", raising=False)

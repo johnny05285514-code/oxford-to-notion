@@ -113,8 +113,10 @@ Copy-Item .env.example .env
 
 ```dotenv
 NOTION_TOKEN=your_notion_integration_token
-NOTION_DATABASE_ID=your_notion_database_id
+NOTION_DATABASE_ID=your_notion_database_id_or_database_url
 ```
+
+`NOTION_DATABASE_ID` 可以直接填数据库 ID，也可以直接粘贴 Notion 数据库页面的完整 URL。
 
 不要把 `.env` 上传到 GitHub。里面有你的私人 token。
 
