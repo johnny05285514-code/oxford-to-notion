@@ -2,9 +2,9 @@
 
 Languages: [简体中文](README.md) | [English](README.en.md)
 
-A small Python CLI tool that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
+A Windows desktop app and Python CLI that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
-After setup, Windows users can double-click `Oxford to Notion.bat` and type only the word.
+The desktop app provides a word input, import button, settings screen, and a link to the resulting Notion page. The original CLI remains available.
 
 ## Why I built this
 
@@ -19,12 +19,11 @@ This project is mainly for personal, low-frequency learning use. For me, it is a
 Good for:
 
 - People who want to organize English vocabulary in Notion
-- People with a little Python / command-line experience
+- People who prefer a regular Windows app over a terminal
 - People willing to follow setup steps for a Notion integration
 
 Not ideal for:
 
-- People who do not want to touch the terminal at all
 - People who want to scrape a large number of words
 - People who want to use it as a commercial dictionary API
 
@@ -111,7 +110,16 @@ You need to:
 | `Source URL` | URL |
 | `Added Date` | Date |
 
-### 5. Configure `.env`
+### 5. Configure Notion credentials
+
+The desktop app shows its Notion settings screen the first time it opens. Enter:
+
+- Your Notion Integration Token
+- Your Notion database URL or Database ID
+
+Click `Save settings`. The token is stored in the current Windows user's AppData folder. It is not bundled into the executable or uploaded to GitHub.
+
+If you use the CLI, you can still configure `.env`:
 
 If you ran `setup.bat`, it creates `.env` for you automatically.
 
@@ -150,9 +158,31 @@ Notes:
 
 Do not upload `.env` to GitHub. It contains your private token.
 
-### 6. Run
+### 6. Run the desktop app
 
-Windows users can double-click:
+After installing the dependencies, you can open the window directly:
+
+```powershell
+.\.venv\Scripts\pythonw.exe gui.py
+```
+
+To build a standalone Windows executable without a terminal window, double-click:
+
+```text
+build_app.bat
+```
+
+The generated app will be located at:
+
+```text
+dist\Oxford to Notion.exe
+```
+
+Then double-click `install_app.bat`. It installs the app for the current Windows user and creates an `Oxford to Notion` desktop shortcut.
+
+### 7. Use the CLI (optional)
+
+The original Windows launcher is still available:
 
 ```text
 Oxford to Notion.bat
@@ -184,7 +214,9 @@ For first-time setup, double-click:
 setup.bat
 ```
 
-After configuring `.env`, double-click:
+For the desktop GUI, run `build_app.bat`, then double-click `dist\Oxford to Notion.exe`.
+
+For the original CLI, configure `.env`, then double-click:
 
 ```text
 Oxford to Notion.bat
@@ -241,7 +273,10 @@ Tests do not access the real Oxford website and do not modify a real Notion data
 ## Project structure
 
 ```text
+gui.py              Windows desktop app entry point
 main.py             CLI entry point
+import_service.py   Shared import workflow for GUI and CLI
+settings_store.py   Local desktop settings
 config.py           Reads .env configuration
 oxford_client.py    Requests Oxford pages
 parser.py           Parses HTML

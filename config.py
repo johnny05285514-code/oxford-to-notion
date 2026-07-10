@@ -1,9 +1,11 @@
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from app_paths import env_path as default_env_path
 from exceptions import ConfigurationError
 
 
@@ -25,9 +27,13 @@ class Settings:
     notion_database_id: str
 
     @classmethod
-    def from_env(cls, load_file: bool = True) -> "Settings":
+    def from_env(
+        cls,
+        load_file: bool = True,
+        env_path: Path | None = None,
+    ) -> "Settings":
         if load_file:
-            load_dotenv()
+            load_dotenv(dotenv_path=env_path or default_env_path())
         values = {
             "NOTION_TOKEN": os.getenv("NOTION_TOKEN", "").strip(),
             "NOTION_DATABASE_ID": os.getenv("NOTION_DATABASE_ID", "").strip(),

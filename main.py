@@ -3,12 +3,8 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from notion_client import Client
-
-from config import Settings
 from exceptions import AppError
-from notion_writer import NotionWriter
-from oxford_client import OxfordClient, normalize_word
+from import_service import build_dependencies, import_word
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,12 +15,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_dependencies() -> tuple[OxfordClient, NotionWriter]:
-    settings = Settings.from_env()
-    notion_client = Client(auth=settings.notion_token)
-    return OxfordClient(), NotionWriter(notion_client, settings.notion_database_id)
-
-
 def run(
     argv: Sequence[str] | None = None,
     *,
@@ -33,11 +23,12 @@ def run(
 ) -> int:
     args = build_parser().parse_args(argv)
     try:
-        word = normalize_word(args.word)
-        if oxford is None or notion is None:
-            oxford, notion = build_dependencies()
-        entry = oxford.lookup(word)
-        page_url = notion.upsert(entry)
+        result = import_word(
+            args.word,
+            oxford=oxford,
+            notion=notion,
+            dependency_factory=build_dependencies,
+        )
     except (AppError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1 if isinstance(exc, AppError) else 2
@@ -45,7 +36,7 @@ def run(
         print("Error: Unexpected failure while importing the word.", file=sys.stderr)
         return 1
 
-    print(f"Imported '{entry.word}': {page_url}")
+    print(f"Imported '{result.word}': {result.page_url}")
     return 0
 
 

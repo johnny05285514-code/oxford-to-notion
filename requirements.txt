@@ -2,4 +2,6 @@ requests>=2.31,<3
 beautifulsoup4>=4.12,<5
 notion-client>=2.2,<3
 python-dotenv>=1.0,<2
+PySide6-Essentials>=6.8,<7
+pyinstaller>=6,<7
 pytest>=8,<9
