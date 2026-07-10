@@ -7,7 +7,7 @@ echo Building Oxford to Notion desktop app...
 
 if not exist ".venv\Scripts\python.exe" (
     echo Error: .venv was not found. Run setup.bat first.
-    pause
+    if /i not "%~1"=="--no-pause" pause
     exit /b 1
 )
 
@@ -22,7 +22,7 @@ if not exist ".venv\Scripts\python.exe" (
 if errorlevel 1 (
     echo.
     echo Build failed. Please check the messages above.
-    pause
+    if /i not "%~1"=="--no-pause" pause
     exit /b 1
 )
 
@@ -31,4 +31,4 @@ echo Build complete:
 echo %~dp0dist\Oxford to Notion.exe
 echo.
 echo Your private .env file was not included in the executable.
-pause
+if /i not "%~1"=="--no-pause" pause

@@ -8,6 +8,20 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 
 桌面版提供输入框、导入按钮、设置页面和 Notion 结果链接，不需要通过 Terminal 操作。原来的 CLI 入口仍然保留。
 
+## Windows 一键安装（推荐）
+
+普通用户不需要安装 Python，也不需要自己构建程序：
+
+1. 打开 [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
+2. 下载 `Oxford-to-Notion-Setup-1.0.0.exe`
+3. 双击安装包，按提示完成安装
+4. 从桌面或开始菜单打开 `Oxford to Notion`
+5. 第一次打开时填写自己的 Notion Token 和数据库 URL
+
+安装包支持英文和简体中文安装界面、可选桌面快捷方式、开始菜单入口和正常卸载。卸载程序时不会自动删除你的 Notion 配置。
+
+这是个人开源项目，安装包目前没有商业代码签名。Windows 可能显示“未知发布者”；请确认文件来自上面的官方 GitHub 仓库，并可使用 Release 中的 `.sha256` 文件核对下载内容。
+
 ## 我为什么做这个
 
 我学英语时经常查单词，但每次都要手动复制词性、释义和例句到 Notion，过程很重复。
@@ -55,7 +69,7 @@ python main.py brutality
 
 如果同一个 `Word` 已经在 Notion 里存在，程序会更新原来的页面，不会重复创建。
 
-## 快速开始
+## 从源代码运行
 
 ### 1. 安装 Python
 
@@ -181,6 +195,8 @@ dist\Oxford to Notion.exe
 ```
 
 然后双击 `install_app.bat`，程序会安装到当前 Windows 用户的应用目录，并在桌面创建 `Oxford to Notion` 快捷方式。
+
+如果你安装了 NSIS，也可以双击 `build_installer.bat` 生成可分发的完整安装包。输出位于 `release\`。
 
 ### 7. 使用命令行版（可选）
 
