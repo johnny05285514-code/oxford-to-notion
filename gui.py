@@ -2,11 +2,20 @@ import sys
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPainterPath, QPen
+from PySide6.QtGui import (
+    QColor,
+    QDesktopServices,
+    QFont,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -19,9 +28,22 @@ from PySide6.QtWidgets import (
 
 from app_paths import resource_path
 from exceptions import AppError
+from i18n import (
+    Translator,
+    detect_system_language,
+    localize_error,
+)
 from import_service import ImportResult, import_word
+from history_store import ImportHistoryItem, add_history_item, read_history
+from language_menu import LanguageMenuButton
 from setup_wizard import ConnectionWorker, SetupWizard
-from settings_store import read_notion_settings, save_notion_settings
+from settings_store import (
+    read_app_language,
+    read_notion_settings,
+    save_app_language,
+    save_notion_settings,
+)
+from update_checker import UpdateInfo, check_for_update
 
 
 APP_STYLE = """
@@ -95,6 +117,45 @@ QProgressBar::chunk {
     border-radius: 3px;
     background: #2563eb;
 }
+QToolButton#language {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+}
+QToolButton#language:hover {
+    background: #f8fafc;
+}
+QToolButton#language::menu-indicator {
+    image: none;
+}
+QFrame#updateBanner {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+}
+QLabel#updateText {
+    color: #1e40af;
+}
+QPushButton#updateAction {
+    min-height: 32px;
+    padding: 0 8px;
+    border: none;
+    color: #2563eb;
+    background: transparent;
+}
+QPushButton#historyItem {
+    min-height: 34px;
+    padding: 0 11px;
+    border: 1px solid #dbe3ed;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #334155;
+    font-weight: 500;
+}
+QPushButton#historyItem:hover {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
 """
 
 
@@ -164,17 +225,48 @@ class ImportWorker(QRunnable):
             self.signals.succeeded.emit(result)
 
 
+class UpdateSignals(QObject):
+    completed = Signal(object)
+
+
+class UpdateWorker(QRunnable):
+    def __init__(self, update_func: Callable[[], UpdateInfo | None]) -> None:
+        super().__init__()
+        self.update_func = update_func
+        self.signals = UpdateSignals()
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            result = self.update_func()
+        except Exception:
+            result = None
+        self.signals.completed.emit(result)
+
+
 class OxfordToNotionWindow(QMainWindow):
     def __init__(
         self,
         *,
         import_func: Callable[[str], ImportResult] = import_word,
+        history_reader: Callable[[], list[ImportHistoryItem]] = read_history,
+        history_adder: Callable[[str, str], list[ImportHistoryItem]] = add_history_item,
+        update_func: Callable[[], UpdateInfo | None] = check_for_update,
+        start_update_check: bool = True,
     ) -> None:
         super().__init__()
         self.import_func = import_func
         self.thread_pool = QThreadPool(self)
         self.thread_pool.setMaxThreadCount(1)
+        self.update_thread_pool = QThreadPool(self)
+        self.update_thread_pool.setMaxThreadCount(1)
         self.current_page_url = ""
+        self.history_reader = history_reader
+        self.history_adder = history_adder
+        self.update_func = update_func
+        self.update_info: UpdateInfo | None = None
+        self.language = read_app_language() or detect_system_language()
+        self.translator = Translator(self.language)
 
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
@@ -199,15 +291,22 @@ class OxfordToNotionWindow(QMainWindow):
             token=stored.notion_token,
             database=stored.notion_database_value,
             thread_pool=self.thread_pool,
+            translator=self.translator,
+            on_language_changed=self.set_language,
         )
         self.stack.addWidget(self.main_page)
         self.stack.addWidget(self.settings_page)
         self.stack.addWidget(self.wizard_page)
+        self.retranslate_ui()
+        self.refresh_history()
+        self.show_update(None)
 
         if stored.is_complete:
             self.show_main_page()
         else:
             self.stack.setCurrentWidget(self.wizard_page)
+        if start_update_check:
+            self.start_update_check()
 
     def _new_card(self) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame(objectName="card")
@@ -215,6 +314,14 @@ class OxfordToNotionWindow(QMainWindow):
         layout.setContentsMargins(34, 30, 34, 28)
         layout.setSpacing(0)
         return card, layout
+
+    def _create_language_button(self, *, main: bool = False) -> LanguageMenuButton:
+        button = LanguageMenuButton(self.set_language)
+        if main:
+            self.language_button = button
+            self.language_menu = button.language_menu
+            self.language_action_group = button.action_group
+        return button
 
     def _build_main_page(self) -> QWidget:
         page = QWidget()
@@ -224,34 +331,35 @@ class OxfordToNotionWindow(QMainWindow):
         page_layout.addWidget(card)
 
         header = QHBoxLayout()
-        title = QLabel("Oxford to Notion", objectName="title")
-        settings_button = QPushButton("设置", objectName="secondary")
-        settings_button.setFixedWidth(76)
-        settings_button.clicked.connect(self.show_settings_page)
-        header.addWidget(title)
+        self.main_title_label = QLabel("Oxford to Notion", objectName="title")
+        self.settings_button = QPushButton(objectName="secondary")
+        self.settings_button.setFixedWidth(92)
+        self.settings_button.clicked.connect(self.show_settings_page)
+        header.addWidget(self.main_title_label)
         header.addStretch()
-        header.addWidget(settings_button)
+        header.addWidget(self._create_language_button(main=True))
+        header.addSpacing(8)
+        header.addWidget(self.settings_button)
         layout.addLayout(header)
 
-        subtitle = QLabel(
-            "输入一个英文单词，自动保存到你的 Notion 单词库",
-            objectName="subtitle",
-        )
-        subtitle.setContentsMargins(0, 10, 0, 26)
-        layout.addWidget(subtitle)
+        self.subtitle_label = QLabel(objectName="subtitle")
+        self.subtitle_label.setContentsMargins(0, 10, 0, 26)
+        layout.addWidget(self.subtitle_label)
 
         self.word_entry = QLineEdit()
-        self.word_entry.setPlaceholderText("例如：brutality")
         self.word_entry.returnPressed.connect(self.start_import)
         layout.addWidget(self.word_entry)
 
-        self.import_button = QPushButton("导入到 Notion", objectName="primary")
+        self.import_button = QPushButton(objectName="primary")
         self.import_button.setContentsMargins(0, 16, 0, 0)
         self.import_button.clicked.connect(self.start_import)
         layout.addSpacing(16)
         layout.addWidget(self.import_button)
 
-        self.status_label = QLabel("准备就绪", objectName="muted")
+        self.status_label = QLabel(objectName="muted")
+        self._status_key = "ready"
+        self._status_values: dict[str, object] = {}
+        self._status_error_source: str | None = None
         self.status_label.setWordWrap(True)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.success_icon = SuccessIcon()
@@ -265,7 +373,7 @@ class OxfordToNotionWindow(QMainWindow):
         layout.addSpacing(24)
         layout.addLayout(status_row)
 
-        self.open_button = QPushButton("在 Notion 中打开", objectName="secondary")
+        self.open_button = QPushButton(objectName="secondary")
         self.open_button.setFixedWidth(176)
         self.open_button.clicked.connect(self.open_notion_page)
         self.open_button.hide()
@@ -276,11 +384,41 @@ class OxfordToNotionWindow(QMainWindow):
         layout.addSpacing(10)
         layout.addLayout(open_row)
 
+        self.update_banner = QFrame(objectName="updateBanner")
+        update_layout = QHBoxLayout(self.update_banner)
+        update_layout.setContentsMargins(12, 5, 8, 5)
+        self.update_label = QLabel(objectName="updateText")
+        self.update_label.setWordWrap(True)
+        self.update_button = QPushButton(objectName="updateAction")
+        self.update_button.clicked.connect(self.open_update_page)
+        update_layout.addWidget(self.update_label, 1)
+        update_layout.addWidget(self.update_button)
+        layout.addSpacing(12)
+        layout.addWidget(self.update_banner)
+        self.update_banner.hide()
+
+        self.history_section = QWidget()
+        history_layout = QVBoxLayout(self.history_section)
+        history_layout.setContentsMargins(0, 0, 0, 0)
+        history_layout.setSpacing(8)
+        self.history_title = QLabel(objectName="subtitle")
+        self.history_title.setStyleSheet("font-weight: 600;")
+        history_layout.addWidget(self.history_title)
+        self.history_grid = QGridLayout()
+        self.history_grid.setContentsMargins(0, 0, 0, 0)
+        self.history_grid.setHorizontalSpacing(8)
+        self.history_grid.setVerticalSpacing(8)
+        history_layout.addLayout(self.history_grid)
+        self.history_buttons: list[QPushButton] = []
+        layout.addSpacing(14)
+        layout.addWidget(self.history_section)
+        self.history_section.hide()
+
         layout.addStretch()
-        footer = QLabel("Personal, low-frequency learning use", objectName="muted")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setStyleSheet("font-size: 11px;")
-        layout.addWidget(footer)
+        self.footer_label = QLabel(objectName="muted")
+        self.footer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.footer_label.setStyleSheet("font-size: 11px;")
+        layout.addWidget(self.footer_label)
         return page
 
     def _build_settings_page(self) -> QWidget:
@@ -290,40 +428,46 @@ class OxfordToNotionWindow(QMainWindow):
         card, layout = self._new_card()
         page_layout.addWidget(card)
 
-        title = QLabel("Notion 设置", objectName="title")
-        layout.addWidget(title)
+        settings_header = QHBoxLayout()
+        self.settings_title_label = QLabel(objectName="title")
+        settings_header.addWidget(self.settings_title_label)
+        settings_header.addStretch()
+        self.settings_language_button = self._create_language_button()
+        settings_header.addWidget(self.settings_language_button)
+        layout.addLayout(settings_header)
 
-        note = QLabel(
-            "配置只保存在这台电脑的 .env 文件中，不会上传到 GitHub。",
-            objectName="subtitle",
-        )
-        note.setWordWrap(True)
-        note.setContentsMargins(0, 8, 0, 22)
-        layout.addWidget(note)
+        self.settings_note_label = QLabel(objectName="subtitle")
+        self.settings_note_label.setWordWrap(True)
+        self.settings_note_label.setContentsMargins(0, 8, 0, 22)
+        layout.addWidget(self.settings_note_label)
 
-        layout.addWidget(QLabel("Notion Integration Token"))
+        self.token_label = QLabel()
+        layout.addWidget(self.token_label)
         layout.addSpacing(6)
         self.token_entry = QLineEdit()
         self.token_entry.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(self.token_entry)
 
-        self.show_token_checkbox = QCheckBox("显示 Token")
+        self.show_token_checkbox = QCheckBox()
         self.show_token_checkbox.toggled.connect(self.toggle_token_visibility)
         layout.addSpacing(8)
         layout.addWidget(self.show_token_checkbox)
 
         layout.addSpacing(18)
-        layout.addWidget(QLabel("Notion 数据库 URL 或 Database ID"))
+        self.database_label = QLabel()
+        layout.addWidget(self.database_label)
         layout.addSpacing(6)
         self.database_entry = QLineEdit()
         layout.addWidget(self.database_entry)
 
         layout.addSpacing(12)
-        wizard_button = QPushButton("打开分步配置向导", objectName="secondary")
-        wizard_button.clicked.connect(self.show_wizard_page)
-        layout.addWidget(wizard_button)
+        self.wizard_button = QPushButton(objectName="secondary")
+        self.wizard_button.clicked.connect(self.show_wizard_page)
+        layout.addWidget(self.wizard_button)
 
         self.settings_status = QLabel("")
+        self._settings_status_key: str | None = None
+        self._settings_error_source: str | None = None
         self.settings_status.setWordWrap(True)
         self.settings_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addSpacing(12)
@@ -331,19 +475,70 @@ class OxfordToNotionWindow(QMainWindow):
 
         layout.addStretch()
         buttons = QHBoxLayout()
-        back_button = QPushButton("返回", objectName="secondary")
-        back_button.clicked.connect(self.show_main_page)
-        self.settings_test_button = QPushButton("测试连接", objectName="secondary")
+        self.settings_back_button = QPushButton(objectName="secondary")
+        self.settings_back_button.clicked.connect(self.show_main_page)
+        self.settings_test_button = QPushButton(objectName="secondary")
         self.settings_test_button.clicked.connect(self.start_settings_connection_test)
-        save_button = QPushButton("保存设置", objectName="primary")
-        save_button.clicked.connect(self.save_settings)
-        buttons.addWidget(back_button)
+        self.settings_save_button = QPushButton(objectName="primary")
+        self.settings_save_button.clicked.connect(self.save_settings)
+        buttons.addWidget(self.settings_back_button)
         buttons.addSpacing(8)
         buttons.addWidget(self.settings_test_button)
         buttons.addSpacing(8)
-        buttons.addWidget(save_button)
+        buttons.addWidget(self.settings_save_button)
         layout.addLayout(buttons)
         return page
+
+    @Slot(str)
+    def set_language(self, code: str) -> None:
+        self.language = Translator(code).language
+        self.translator = Translator(self.language)
+        self.retranslate_ui()
+        try:
+            save_app_language(self.language)
+        except AppError:
+            self.set_status(self.translator.text("language_save_warning"), "#b45309")
+
+    def retranslate_ui(self) -> None:
+        text = self.translator.text
+        self.settings_button.setText(text("settings"))
+        self.subtitle_label.setText(text("subtitle"))
+        self.word_entry.setPlaceholderText(text("word_placeholder"))
+        self.import_button.setText(text("import"))
+        self.open_button.setText(text("open_notion"))
+        self.footer_label.setText(text("footer"))
+        self.settings_title_label.setText(text("settings_title"))
+        self.settings_note_label.setText(text("settings_note"))
+        self.token_label.setText(text("token_label"))
+        self.show_token_checkbox.setText(text("show_token"))
+        self.database_label.setText(text("database_label"))
+        self.wizard_button.setText(text("open_wizard"))
+        self.settings_back_button.setText(text("back"))
+        self.settings_test_button.setText(text("test_connection"))
+        self.settings_save_button.setText(text("save_settings"))
+        self.history_title.setText(text("recently_imported"))
+        self.update_button.setText(text("view_update"))
+        if self.update_info is not None:
+            self.update_label.setText(
+                text("update_available", version=self.update_info.version)
+            )
+        for button in self.history_buttons:
+            button.setToolTip(text("open_history_item", word=button.property("word")))
+        tooltip = text("language_tooltip")
+        self.language_button.set_language_state(self.language, tooltip)
+        self.settings_language_button.set_language_state(self.language, tooltip)
+        if self._status_key:
+            self.status_label.setText(text(self._status_key, **self._status_values))
+        elif self._status_error_source:
+            self.status_label.setText(localize_error(self._status_error_source, self.translator))
+        if self._settings_status_key:
+            self.settings_status.setText(text(self._settings_status_key))
+        elif self._settings_error_source:
+            self.settings_status.setText(
+                localize_error(self._settings_error_source, self.translator)
+            )
+        if hasattr(self, "wizard_page"):
+            self.wizard_page.apply_translator(self.translator)
 
     @Slot()
     def show_main_page(self) -> None:
@@ -356,8 +551,10 @@ class OxfordToNotionWindow(QMainWindow):
         self.token_entry.setText(stored.notion_token)
         self.database_entry.setText(stored.notion_database_value)
         self.settings_status.clear()
+        self._settings_status_key = None
+        self._settings_error_source = None
         self.settings_test_button.setEnabled(True)
-        self.settings_test_button.setText("测试连接")
+        self.settings_test_button.setText(self.translator.text("test_connection"))
         self.stack.setCurrentWidget(self.settings_page)
         self.token_entry.setFocus()
 
@@ -372,24 +569,24 @@ class OxfordToNotionWindow(QMainWindow):
         try:
             save_notion_settings(token, database)
         except AppError as exc:
-            self.wizard_page.show_error(str(exc))
+            self.wizard_page.show_error_source(str(exc))
             return
         self.show_main_page()
-        self.set_status("配置完成，可以开始导入单词。", "#15803d", success=True)
+        self.set_status_key("setup_complete", "#15803d", success=True)
 
     @Slot()
     def start_import(self) -> None:
         word = self.word_entry.text().strip()
         if not word:
-            self.set_status("请输入一个英文单词。", "#b91c1c")
+            self.set_status_key("enter_word", "#b91c1c")
             return
 
         self.current_page_url = ""
         self.open_button.hide()
         self.word_entry.setEnabled(False)
         self.import_button.setEnabled(False)
-        self.import_button.setText("正在导入…")
-        self.set_status(f"正在查询 {word}…", "#64748b")
+        self.import_button.setText(self.translator.text("importing"))
+        self.set_status_key("querying", "#64748b", word=word)
 
         worker = ImportWorker(word, self.import_func)
         worker.signals.succeeded.connect(self.finish_success)
@@ -400,21 +597,42 @@ class OxfordToNotionWindow(QMainWindow):
     def finish_success(self, result: ImportResult) -> None:
         self.set_ready()
         self.current_page_url = result.page_url
-        self.set_status(f"{result.word} 已成功导入", "#15803d", success=True)
+        self.set_status_key("import_success", "#15803d", success=True, word=result.word)
         self.open_button.show()
+        items = self.history_adder(result.word, result.page_url)
+        self.refresh_history(items)
         self.word_entry.clear()
         self.word_entry.setFocus()
 
     @Slot(str)
     def finish_error(self, message: str) -> None:
         self.set_ready()
-        self.set_status(message, "#b91c1c")
+        self.set_error_status(message)
         self.word_entry.setFocus()
 
     def set_ready(self) -> None:
         self.word_entry.setEnabled(True)
         self.import_button.setEnabled(True)
-        self.import_button.setText("导入到 Notion")
+        self.import_button.setText(self.translator.text("import"))
+
+    def set_status_key(
+        self,
+        key: str,
+        color: str,
+        *,
+        success: bool = False,
+        **values: object,
+    ) -> None:
+        self._status_key = key
+        self._status_values = values
+        self._status_error_source = None
+        self.set_status(self.translator.text(key, **values), color, success=success)
+
+    def set_error_status(self, message: str) -> None:
+        self._status_key = None
+        self._status_values = {}
+        self._status_error_source = message
+        self.set_status(localize_error(message, self.translator), "#b91c1c")
 
     def set_status(self, message: str, color: str, *, success: bool = False) -> None:
         self.status_label.setText(message)
@@ -426,6 +644,55 @@ class OxfordToNotionWindow(QMainWindow):
         if self.current_page_url:
             QDesktopServices.openUrl(QUrl(self.current_page_url))
 
+    def refresh_history(self, items: list[ImportHistoryItem] | None = None) -> None:
+        for button in self.history_buttons:
+            self.history_grid.removeWidget(button)
+            button.deleteLater()
+        self.history_buttons.clear()
+
+        history = (items if items is not None else self.history_reader())[:5]
+        for index, item in enumerate(history):
+            button = QPushButton(f"{item.word} ↗", objectName="historyItem")
+            button.setProperty("word", item.word)
+            button.setToolTip(
+                self.translator.text("open_history_item", word=item.word)
+            )
+            button.clicked.connect(
+                lambda _checked=False, url=item.page_url: self.open_external_url(url)
+            )
+            self.history_grid.addWidget(button, index // 3, index % 3)
+            self.history_buttons.append(button)
+        self.history_section.setVisible(bool(self.history_buttons))
+
+    @Slot()
+    def start_update_check(self) -> None:
+        worker = UpdateWorker(self.update_func)
+        worker.signals.completed.connect(self.show_update)
+        self.update_thread_pool.start(worker)
+
+    @Slot(object)
+    def show_update(self, info: UpdateInfo | None) -> None:
+        self.update_info = info
+        if info is None:
+            self.update_banner.hide()
+            return
+        self.update_label.setText(
+            self.translator.text("update_available", version=info.version)
+        )
+        self.update_button.setText(self.translator.text("view_update"))
+        self.update_banner.show()
+
+    @Slot()
+    def open_update_page(self) -> None:
+        if self.update_info is not None:
+            self.open_external_url(self.update_info.release_url)
+
+    @staticmethod
+    def open_external_url(url: str) -> None:
+        target = QUrl(url)
+        if target.isValid() and target.scheme().lower() in {"http", "https"}:
+            QDesktopServices.openUrl(target)
+
     @Slot(bool)
     def toggle_token_visibility(self, visible: bool) -> None:
         mode = QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password
@@ -436,14 +703,12 @@ class OxfordToNotionWindow(QMainWindow):
         token = self.token_entry.text().strip()
         database = self.database_entry.text().strip()
         if not token or not database:
-            self.settings_status.setText("请先填写完整的 Token 和数据库链接。")
-            self.settings_status.setStyleSheet("color: #b91c1c;")
+            self.set_settings_status_key("settings_incomplete", "#b91c1c")
             return
 
         self.settings_test_button.setEnabled(False)
-        self.settings_test_button.setText("正在测试…")
-        self.settings_status.setText("正在检查 Token、数据库权限和字段结构…")
-        self.settings_status.setStyleSheet("color: #64748b;")
+        self.settings_test_button.setText(self.translator.text("testing"))
+        self.set_settings_status_key("checking_connection", "#64748b")
         worker = ConnectionWorker(token, database)
         worker.signals.succeeded.connect(self.finish_settings_connection_test)
         worker.signals.failed.connect(self.fail_settings_connection_test)
@@ -452,28 +717,37 @@ class OxfordToNotionWindow(QMainWindow):
     @Slot(object)
     def finish_settings_connection_test(self, _result) -> None:
         self.settings_test_button.setEnabled(True)
-        self.settings_test_button.setText("重新测试")
-        self.settings_status.setText("连接成功：Token、数据库权限和字段结构都正确。")
-        self.settings_status.setStyleSheet("color: #15803d;")
+        self.settings_test_button.setText(self.translator.text("retest"))
+        self.set_settings_status_key("connection_success", "#15803d")
 
     @Slot(str)
     def fail_settings_connection_test(self, message: str) -> None:
         self.settings_test_button.setEnabled(True)
-        self.settings_test_button.setText("重新测试")
-        self.settings_status.setText(message)
+        self.settings_test_button.setText(self.translator.text("retest"))
+        self._settings_status_key = None
+        self._settings_error_source = message
+        self.settings_status.setText(localize_error(message, self.translator))
         self.settings_status.setStyleSheet("color: #b91c1c;")
+
+    def set_settings_status_key(self, key: str, color: str) -> None:
+        self._settings_status_key = key
+        self._settings_error_source = None
+        self.settings_status.setText(self.translator.text(key))
+        self.settings_status.setStyleSheet(f"color: {color};")
 
     @Slot()
     def save_settings(self) -> None:
         try:
             save_notion_settings(self.token_entry.text(), self.database_entry.text())
         except AppError as exc:
-            self.settings_status.setText(str(exc))
+            self._settings_status_key = None
+            self._settings_error_source = str(exc)
+            self.settings_status.setText(localize_error(str(exc), self.translator))
             self.settings_status.setStyleSheet("color: #b91c1c;")
             return
 
         self.show_main_page()
-        self.set_status("设置已保存，可以开始导入单词。", "#15803d", success=True)
+        self.set_status_key("settings_saved", "#15803d", success=True)
 
 
 def main() -> int:

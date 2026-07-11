@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 )
 
 from exceptions import AppError
+from i18n import Translator, localize_error
+from language_menu import LanguageMenuButton
 from notion_connection import ConnectionResult, check_notion_connection
 
 
@@ -83,6 +85,8 @@ class SetupWizard(QWidget):
         database: str = "",
         connection_func: Callable[[str, str], ConnectionResult] = check_notion_connection,
         thread_pool: QThreadPool | None = None,
+        translator: Translator | None = None,
+        on_language_changed: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__()
         self.state = SetupWizardState()
@@ -91,6 +95,11 @@ class SetupWizard(QWidget):
         self.connection_func = connection_func
         self.thread_pool = thread_pool or QThreadPool(self)
         self.connection_passed = False
+        self._status_key: str | None = None
+        self._status_error_source: str | None = None
+        self.translator = translator or Translator("zh-CN")
+        self.on_language_changed = on_language_changed
+        self.step_text_labels: list[tuple[QLabel, QLabel, str, str]] = []
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -101,14 +110,20 @@ class SetupWizard(QWidget):
         outer.addWidget(card)
 
         header = QHBoxLayout()
-        header.addWidget(QLabel("首次配置 Notion", objectName="title"))
+        self.title_label = QLabel(objectName="title")
+        header.addWidget(self.title_label)
         header.addStretch()
-        cancel_button = QPushButton("退出向导", objectName="secondary")
-        cancel_button.setFixedWidth(90)
-        cancel_button.setEnabled(on_cancel is not None)
+        self.language_button = LanguageMenuButton(self.set_language)
+        self.language_menu = self.language_button.language_menu
+        self.language_action_group = self.language_button.action_group
+        header.addWidget(self.language_button)
+        header.addSpacing(8)
+        self.cancel_button = QPushButton(objectName="secondary")
+        self.cancel_button.setFixedWidth(100)
+        self.cancel_button.setEnabled(on_cancel is not None)
         if on_cancel is not None:
-            cancel_button.clicked.connect(on_cancel)
-        header.addWidget(cancel_button)
+            self.cancel_button.clicked.connect(on_cancel)
+        header.addWidget(self.cancel_button)
         layout.addLayout(header)
 
         self.step_label = QLabel("第 1 / 5 步", objectName="subtitle")
@@ -149,73 +164,78 @@ class SetupWizard(QWidget):
 
         self.token_entry.textChanged.connect(self.invalidate_connection)
         self.database_entry.textChanged.connect(self.invalidate_connection)
+        self.retranslate_ui()
         self.update_step()
 
-    def _base_step(self, title: str, description: str) -> tuple[QWidget, QVBoxLayout]:
+    def _base_step(
+        self, title_key: str, description_key: str
+    ) -> tuple[QWidget, QVBoxLayout]:
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        title_label = QLabel(title)
+        title_label = QLabel()
         title_label.setStyleSheet("font-size: 19px; font-weight: 600;")
         layout.addWidget(title_label)
         layout.addSpacing(8)
-        description_label = QLabel(description, objectName="subtitle")
+        description_label = QLabel(objectName="subtitle")
         description_label.setWordWrap(True)
         layout.addWidget(description_label)
         layout.addSpacing(18)
+        self.step_text_labels.append(
+            (title_label, description_label, title_key, description_key)
+        )
         return page, layout
 
     def _template_step(self) -> QWidget:
         page, layout = self._base_step(
-            "复制 Notion 数据库模板",
-            "模板已经包含程序需要的全部字段。打开模板后，点击右上角 Duplicate，复制到你自己的 workspace。",
+            "template_title",
+            "template_description",
         )
-        button = QPushButton("打开 Notion 模板", objectName="primary")
-        button.clicked.connect(lambda: self.open_link(TEMPLATE_URL))
-        layout.addWidget(button)
+        self.template_button = QPushButton(objectName="primary")
+        self.template_button.clicked.connect(lambda: self.open_link(TEMPLATE_URL))
+        layout.addWidget(self.template_button)
         layout.addStretch()
         return page
 
     def _integration_step(self) -> QWidget:
         page, layout = self._base_step(
-            "创建并连接 Notion Integration",
-            "创建 Internal Integration，复制它的 Token，然后在 Notion 中把这个 Integration 连接到刚才复制的数据库。",
+            "integration_title",
+            "integration_description",
         )
-        open_button = QPushButton("打开 Notion Integrations", objectName="primary")
-        open_button.clicked.connect(lambda: self.open_link(INTEGRATIONS_URL))
-        help_button = QPushButton("查看 Notion 官方说明", objectName="secondary")
-        help_button.clicked.connect(lambda: self.open_link(NOTION_HELP_URL))
-        layout.addWidget(open_button)
+        self.integrations_button = QPushButton(objectName="primary")
+        self.integrations_button.clicked.connect(lambda: self.open_link(INTEGRATIONS_URL))
+        self.help_button = QPushButton(objectName="secondary")
+        self.help_button.clicked.connect(lambda: self.open_link(NOTION_HELP_URL))
+        layout.addWidget(self.integrations_button)
         layout.addSpacing(10)
-        layout.addWidget(help_button)
+        layout.addWidget(self.help_button)
         layout.addStretch()
         return page
 
     def _token_step(self, token: str) -> QWidget:
         page, layout = self._base_step(
-            "粘贴 Integration Token",
-            "Token 只会保存在你的电脑中。不要把它发送给别人，也不要上传到 GitHub。",
+            "token_title",
+            "token_description",
         )
         self.token_entry = QLineEdit()
         self.token_entry.setEchoMode(QLineEdit.EchoMode.Password)
-        self.token_entry.setPlaceholderText("粘贴 Notion Integration Token")
         self.token_entry.setText(token)
         layout.addWidget(self.token_entry)
         layout.addSpacing(8)
-        show_token = QCheckBox("显示 Token")
-        show_token.toggled.connect(
+        self.show_token_checkbox = QCheckBox()
+        self.show_token_checkbox.toggled.connect(
             lambda visible: self.token_entry.setEchoMode(
                 QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password
             )
         )
-        layout.addWidget(show_token)
+        layout.addWidget(self.show_token_checkbox)
         layout.addStretch()
         return page
 
     def _database_step(self, database: str) -> QWidget:
         page, layout = self._base_step(
-            "粘贴 Notion 数据库链接",
-            "打开刚才复制的数据库，复制完整页面 URL。程序会自动从 URL 中识别 Database ID。",
+            "database_title",
+            "database_description",
         )
         self.database_entry = QLineEdit()
         self.database_entry.setPlaceholderText("https://www.notion.so/...")
@@ -226,12 +246,12 @@ class SetupWizard(QWidget):
 
     def _test_step(self) -> QWidget:
         page, layout = self._base_step(
-            "测试 Notion 连接",
-            "测试不会写入单词。它只检查 Token、数据库权限和字段结构是否正确。",
+            "connection_title",
+            "connection_description",
         )
-        self.test_button = QPushButton("测试连接", objectName="primary")
+        self.test_button = QPushButton(objectName="primary")
         self.test_button.clicked.connect(self.start_connection_test)
-        self.finish_button = QPushButton("保存并开始使用", objectName="secondary")
+        self.finish_button = QPushButton(objectName="secondary")
         self.finish_button.setEnabled(False)
         self.finish_button.clicked.connect(self.finish_setup)
         layout.addWidget(self.test_button)
@@ -240,21 +260,63 @@ class SetupWizard(QWidget):
         layout.addStretch()
         return page
 
+    @Slot(str)
+    def set_language(self, code: str) -> None:
+        self.translator = Translator(code)
+        self.retranslate_ui()
+        if self.on_language_changed is not None:
+            self.on_language_changed(self.translator.language)
+
+    def apply_translator(self, translator: Translator) -> None:
+        self.translator = translator
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        text = self.translator.text
+        self.title_label.setText(text("wizard_title"))
+        self.cancel_button.setText(text("exit_wizard"))
+        self.language_button.set_language_state(
+            self.translator.language, text("language_tooltip")
+        )
+        self.back_button.setText(text("previous"))
+        self.next_button.setText(text("next"))
+        for title, description, title_key, description_key in self.step_text_labels:
+            title.setText(text(title_key))
+            description.setText(text(description_key))
+        self.template_button.setText(text("open_template"))
+        self.integrations_button.setText(text("open_integrations"))
+        self.help_button.setText(text("open_notion_help"))
+        self.token_entry.setPlaceholderText(text("token_placeholder"))
+        self.show_token_checkbox.setText(text("show_token"))
+        self.test_button.setText(text("test_connection"))
+        self.finish_button.setText(text("save_and_start"))
+        self.update_step()
+        if self._status_key:
+            self.page_status.setText(text(self._status_key))
+        elif self._status_error_source:
+            self.page_status.setText(
+                localize_error(self._status_error_source, self.translator)
+            )
+
     @Slot()
     def go_next(self) -> None:
         if self.state.current_step == 2 and not self.token_entry.text().strip():
-            self.show_error("请先填写 Notion Integration Token。")
+            self.show_error_key("token_required")
             return
         if self.state.current_step == 3 and not self.database_entry.text().strip():
-            self.show_error("请先填写 Notion 数据库 URL。")
+            self.show_error_key("database_required")
             return
         self.page_status.clear()
+        self._status_key = None
+        self._status_error_source = None
         self.state.advance()
         self.update_step()
 
     @Slot()
     def go_back(self) -> None:
         self.page_status.clear()
+        self._status_key = None
+        self._status_error_source = None
         self.state.back()
         self.update_step()
 
@@ -262,7 +324,11 @@ class SetupWizard(QWidget):
         index = self.state.current_step
         self.pages.setCurrentIndex(index)
         self.progress.setValue(index + 1)
-        self.step_label.setText(f"第 {index + 1} / {self.state.total_steps} 步")
+        self.step_label.setText(
+            self.translator.text(
+                "step_progress", current=index + 1, total=self.state.total_steps
+            )
+        )
         self.back_button.setEnabled(index > 0)
         self.next_button.setVisible(index < self.state.total_steps - 1)
 
@@ -275,9 +341,11 @@ class SetupWizard(QWidget):
     def reset(self, token: str, database: str) -> None:
         self.state.current_step = 0
         self.page_status.clear()
+        self._status_key = None
+        self._status_error_source = None
         self.set_values(token, database)
         self.test_button.setEnabled(True)
-        self.test_button.setText("测试连接")
+        self.test_button.setText(self.translator.text("test_connection"))
         self.update_step()
 
     @Slot()
@@ -285,14 +353,16 @@ class SetupWizard(QWidget):
         token = self.token_entry.text().strip()
         database = self.database_entry.text().strip()
         if not token or not database:
-            self.show_error("请返回上一步，填写完整的 Token 和数据库链接。")
+            self.show_error_key("complete_previous_steps")
             return
 
         self.connection_passed = False
         self.finish_button.setEnabled(False)
         self.test_button.setEnabled(False)
-        self.test_button.setText("正在测试…")
-        self.page_status.setText("正在检查 Token、数据库权限和字段结构…")
+        self.test_button.setText(self.translator.text("testing"))
+        self._status_key = "checking_connection"
+        self._status_error_source = None
+        self.page_status.setText(self.translator.text(self._status_key))
         self.page_status.setStyleSheet("color: #64748b;")
 
         worker = ConnectionWorker(token, database, self.connection_func)
@@ -304,23 +374,27 @@ class SetupWizard(QWidget):
     def finish_connection(self, _result: ConnectionResult) -> None:
         self.connection_passed = True
         self.test_button.setEnabled(True)
-        self.test_button.setText("重新测试")
+        self.test_button.setText(self.translator.text("retest"))
         self.finish_button.setEnabled(True)
-        self.page_status.setText("连接成功：Token、数据库权限和字段结构都正确。")
+        self._status_key = "connection_success"
+        self._status_error_source = None
+        self.page_status.setText(self.translator.text(self._status_key))
         self.page_status.setStyleSheet("color: #15803d;")
 
     @Slot(str)
     def fail_connection(self, message: str) -> None:
         self.connection_passed = False
         self.test_button.setEnabled(True)
-        self.test_button.setText("重新测试")
+        self.test_button.setText(self.translator.text("retest"))
         self.finish_button.setEnabled(False)
-        self.show_error(message)
+        self.show_error_source(message)
 
     @Slot()
     def invalidate_connection(self) -> None:
         if self.connection_passed:
-            self.page_status.setText("配置已经更改，请重新测试连接。")
+            self._status_key = "connection_changed"
+            self._status_error_source = None
+            self.page_status.setText(self.translator.text(self._status_key))
             self.page_status.setStyleSheet("color: #b45309;")
         self.connection_passed = False
         if hasattr(self, "finish_button"):
@@ -333,7 +407,21 @@ class SetupWizard(QWidget):
         self.on_complete(self.token_entry.text().strip(), self.database_entry.text().strip())
 
     def show_error(self, message: str) -> None:
+        self._status_key = None
+        self._status_error_source = None
         self.page_status.setText(message)
+        self.page_status.setStyleSheet("color: #b91c1c;")
+
+    def show_error_key(self, key: str) -> None:
+        self._status_key = key
+        self._status_error_source = None
+        self.page_status.setText(self.translator.text(key))
+        self.page_status.setStyleSheet("color: #b91c1c;")
+
+    def show_error_source(self, message: str) -> None:
+        self._status_key = None
+        self._status_error_source = message
+        self.page_status.setText(localize_error(message, self.translator))
         self.page_status.setStyleSheet("color: #b91c1c;")
 
     @staticmethod

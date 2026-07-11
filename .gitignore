@@ -17,6 +17,7 @@ htmlcov/
 .agents/
 .codex/
 docs/superpowers/
+.superpowers/
 
 outputs/
 work/
