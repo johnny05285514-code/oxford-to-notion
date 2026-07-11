@@ -88,6 +88,12 @@ class NotionWriter:
         self.database_id = database_id
         self.today = today
 
+    def validate_connection(self) -> str:
+        """Validate database access and schema without writing any data."""
+        data_source_id, schema = self._resolve_data_source()
+        self._validate_schema(schema)
+        return data_source_id
+
     def upsert(self, entry: WordEntry) -> str:
         try:
             data_source_id, schema = self._resolve_data_source()

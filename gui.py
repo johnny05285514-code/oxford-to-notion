@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from exceptions import AppError
 from import_service import ImportResult, import_word
+from setup_wizard import ConnectionWorker, SetupWizard
 from settings_store import read_notion_settings, save_notion_settings
 
 
@@ -81,6 +82,17 @@ QPushButton#secondary:hover {
 QCheckBox {
     color: #475569;
     spacing: 8px;
+}
+QProgressBar {
+    min-height: 7px;
+    max-height: 7px;
+    border: none;
+    border-radius: 3px;
+    background: #e2e8f0;
+}
+QProgressBar::chunk {
+    border-radius: 3px;
+    background: #2563eb;
 }
 """
 
@@ -176,15 +188,24 @@ class OxfordToNotionWindow(QMainWindow):
         root_layout.addWidget(self.stack)
         self.setCentralWidget(root)
 
+        stored = read_notion_settings()
         self.main_page = self._build_main_page()
         self.settings_page = self._build_settings_page()
+        self.wizard_page = SetupWizard(
+            on_complete=self.complete_setup,
+            on_cancel=self.show_settings_page,
+            token=stored.notion_token,
+            database=stored.notion_database_value,
+            thread_pool=self.thread_pool,
+        )
         self.stack.addWidget(self.main_page)
         self.stack.addWidget(self.settings_page)
+        self.stack.addWidget(self.wizard_page)
 
-        if read_notion_settings().is_complete:
+        if stored.is_complete:
             self.show_main_page()
         else:
-            self.show_settings_page()
+            self.stack.setCurrentWidget(self.wizard_page)
 
     def _new_card(self) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame(objectName="card")
@@ -295,6 +316,11 @@ class OxfordToNotionWindow(QMainWindow):
         self.database_entry = QLineEdit()
         layout.addWidget(self.database_entry)
 
+        layout.addSpacing(12)
+        wizard_button = QPushButton("打开分步配置向导", objectName="secondary")
+        wizard_button.clicked.connect(self.show_wizard_page)
+        layout.addWidget(wizard_button)
+
         self.settings_status = QLabel("")
         self.settings_status.setWordWrap(True)
         self.settings_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -305,10 +331,14 @@ class OxfordToNotionWindow(QMainWindow):
         buttons = QHBoxLayout()
         back_button = QPushButton("返回", objectName="secondary")
         back_button.clicked.connect(self.show_main_page)
+        self.settings_test_button = QPushButton("测试连接", objectName="secondary")
+        self.settings_test_button.clicked.connect(self.start_settings_connection_test)
         save_button = QPushButton("保存设置", objectName="primary")
         save_button.clicked.connect(self.save_settings)
         buttons.addWidget(back_button)
-        buttons.addSpacing(10)
+        buttons.addSpacing(8)
+        buttons.addWidget(self.settings_test_button)
+        buttons.addSpacing(8)
         buttons.addWidget(save_button)
         layout.addLayout(buttons)
         return page
@@ -324,8 +354,26 @@ class OxfordToNotionWindow(QMainWindow):
         self.token_entry.setText(stored.notion_token)
         self.database_entry.setText(stored.notion_database_value)
         self.settings_status.clear()
+        self.settings_test_button.setEnabled(True)
+        self.settings_test_button.setText("测试连接")
         self.stack.setCurrentWidget(self.settings_page)
         self.token_entry.setFocus()
+
+    @Slot()
+    def show_wizard_page(self) -> None:
+        stored = read_notion_settings()
+        self.wizard_page.reset(stored.notion_token, stored.notion_database_value)
+        self.stack.setCurrentWidget(self.wizard_page)
+
+    @Slot(str, str)
+    def complete_setup(self, token: str, database: str) -> None:
+        try:
+            save_notion_settings(token, database)
+        except AppError as exc:
+            self.wizard_page.show_error(str(exc))
+            return
+        self.show_main_page()
+        self.set_status("配置完成，可以开始导入单词。", "#15803d", success=True)
 
     @Slot()
     def start_import(self) -> None:
@@ -380,6 +428,38 @@ class OxfordToNotionWindow(QMainWindow):
     def toggle_token_visibility(self, visible: bool) -> None:
         mode = QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password
         self.token_entry.setEchoMode(mode)
+
+    @Slot()
+    def start_settings_connection_test(self) -> None:
+        token = self.token_entry.text().strip()
+        database = self.database_entry.text().strip()
+        if not token or not database:
+            self.settings_status.setText("请先填写完整的 Token 和数据库链接。")
+            self.settings_status.setStyleSheet("color: #b91c1c;")
+            return
+
+        self.settings_test_button.setEnabled(False)
+        self.settings_test_button.setText("正在测试…")
+        self.settings_status.setText("正在检查 Token、数据库权限和字段结构…")
+        self.settings_status.setStyleSheet("color: #64748b;")
+        worker = ConnectionWorker(token, database)
+        worker.signals.succeeded.connect(self.finish_settings_connection_test)
+        worker.signals.failed.connect(self.fail_settings_connection_test)
+        self.thread_pool.start(worker)
+
+    @Slot(object)
+    def finish_settings_connection_test(self, _result) -> None:
+        self.settings_test_button.setEnabled(True)
+        self.settings_test_button.setText("重新测试")
+        self.settings_status.setText("连接成功：Token、数据库权限和字段结构都正确。")
+        self.settings_status.setStyleSheet("color: #15803d;")
+
+    @Slot(str)
+    def fail_settings_connection_test(self, message: str) -> None:
+        self.settings_test_button.setEnabled(True)
+        self.settings_test_button.setText("重新测试")
+        self.settings_status.setText(message)
+        self.settings_status.setStyleSheet("color: #b91c1c;")
 
     @Slot()
     def save_settings(self) -> None:

@@ -11,10 +11,10 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download `Oxford-to-Notion-Setup-1.0.0.exe`
+2. Download `Oxford-to-Notion-Setup-1.1.0.exe`
 3. Run the installer and follow the prompts
 4. Open `Oxford to Notion` from the desktop or Start menu
-5. Enter your own Notion token and database URL on first launch
+5. Follow the five-step first-run wizard to configure and test Notion
 
 The installer supports English and Simplified Chinese, an optional desktop shortcut, a Start menu entry, and normal Windows uninstall. Uninstalling the app does not automatically delete your Notion configuration.
 
@@ -126,12 +126,20 @@ You need to:
 
 ### 5. Configure Notion credentials
 
-The desktop app shows its Notion settings screen the first time it opens. Enter:
+The desktop app shows a five-step setup wizard the first time it opens:
+
+1. Duplicate the Notion database template
+2. Create and connect a Notion Integration
+3. Paste the Integration token
+4. Paste the database URL
+5. Test the token, database permissions, and required properties
+
+After the test succeeds, click `Save and start`. The token is stored in the current Windows user's AppData folder. It is not bundled into the executable or uploaded to GitHub.
+
+You can reopen the wizard or run `Test connection` later from the Settings screen. The required values are still:
 
 - Your Notion Integration Token
 - Your Notion database URL or Database ID
-
-Click `Save settings`. The token is stored in the current Windows user's AppData folder. It is not bundled into the executable or uploaded to GitHub.
 
 If you use the CLI, you can still configure `.env`:
 
@@ -290,6 +298,8 @@ Tests do not access the real Oxford website and do not modify a real Notion data
 
 ```text
 gui.py              Windows desktop app entry point
+setup_wizard.py     First-run setup wizard
+notion_connection.py Read-only connection and schema check
 main.py             CLI entry point
 import_service.py   Shared import workflow for GUI and CLI
 settings_store.py   Local desktop settings

@@ -13,10 +13,10 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 普通用户不需要安装 Python，也不需要自己构建程序：
 
 1. 打开 [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. 下载 `Oxford-to-Notion-Setup-1.0.0.exe`
+2. 下载 `Oxford-to-Notion-Setup-1.1.0.exe`
 3. 双击安装包，按提示完成安装
 4. 从桌面或开始菜单打开 `Oxford to Notion`
-5. 第一次打开时填写自己的 Notion Token 和数据库 URL
+5. 第一次打开时按照五步向导完成 Notion 配置和连接测试
 
 安装包支持英文和简体中文安装界面、可选桌面快捷方式、开始菜单入口和正常卸载。卸载程序时不会自动删除你的 Notion 配置。
 
@@ -128,12 +128,20 @@ python -m pip install -r requirements.txt
 
 ### 5. 配置 Notion 凭据
 
-桌面版第一次打开时会自动显示“Notion 设置”页面。填写：
+桌面版第一次打开时会自动显示五步配置向导：
+
+1. 复制 Notion 数据库模板
+2. 创建并连接 Notion Integration
+3. 粘贴 Integration Token
+4. 粘贴数据库 URL
+5. 测试 Token、数据库权限和字段结构
+
+测试成功后点击“保存并开始使用”。Token 会保存在当前 Windows 用户的 AppData 中，不会打包进 `.exe`，也不会上传到 GitHub。
+
+以后也可以从“设置”页面重新打开向导，或者直接点击“测试连接”。需要填写的内容仍然是：
 
 - Notion Integration Token
 - Notion 数据库 URL 或 Database ID
-
-点击“保存设置”即可。Token 会保存在当前 Windows 用户的 AppData 中，不会打包进 `.exe`，也不会上传到 GitHub。
 
 如果你使用 CLI，也可以继续配置 `.env`：
 
@@ -292,6 +300,8 @@ python -m pytest -q
 
 ```text
 gui.py              Windows 桌面界面入口
+setup_wizard.py     首次配置向导
+notion_connection.py 只读连接和字段检查
 main.py             命令行入口
 import_service.py   桌面版和 CLI 共用的导入流程
 settings_store.py   桌面版本地设置

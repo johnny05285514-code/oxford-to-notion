@@ -4,7 +4,7 @@ Unicode True
 !include "Sections.nsh"
 
 !define APP_NAME "Oxford to Notion"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "1.1.0"
 !define APP_PUBLISHER "johnny05285514-code"
 !define APP_EXE "Oxford to Notion.exe"
 !define APP_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OxfordToNotion"
@@ -19,7 +19,7 @@ ShowInstDetails show
 ShowUninstDetails show
 BrandingText "Oxford to Notion"
 
-VIProductVersion "1.0.0.0"
+VIProductVersion "1.1.0.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"

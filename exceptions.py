@@ -30,6 +30,10 @@ class NotionError(AppError):
     pass
 
 
+class NotionConnectionError(NotionError):
+    pass
+
+
 class NotionSchemaError(NotionError):
     pass
 
