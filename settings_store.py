@@ -6,6 +6,7 @@ from dotenv import dotenv_values, set_key
 
 from app_paths import env_path as default_env_path
 from exceptions import ConfigurationError
+from i18n import SUPPORTED_LANGUAGE_CODES
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,3 +54,21 @@ def save_notion_settings(
     # Keep the running GUI in sync without requiring a restart.
     os.environ["NOTION_TOKEN"] = token
     os.environ["NOTION_DATABASE_ID"] = database
+
+
+def read_app_language(*, env_path: Path | None = None) -> str | None:
+    path = env_path or default_env_path()
+    values = dotenv_values(path) if path.exists() else {}
+    language = (values.get("APP_LANGUAGE") or "").strip()
+    return language if language in SUPPORTED_LANGUAGE_CODES else None
+
+
+def save_app_language(language: str, *, env_path: Path | None = None) -> None:
+    if language not in SUPPORTED_LANGUAGE_CODES:
+        raise ConfigurationError(f"Unsupported application language: {language}")
+
+    path = env_path or default_env_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.touch()
+    set_key(str(path), "APP_LANGUAGE", language)

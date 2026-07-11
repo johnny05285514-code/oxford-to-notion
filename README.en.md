@@ -8,6 +8,10 @@ Languages: [简体中文](README.md) | [English](README.en.md)
 
 A Windows desktop app and Python CLI that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Oxford to Notion demonstration" width="720">
+</p>
+
 The desktop app provides a word input, import button, settings screen, and a link to the resulting Notion page. The original CLI remains available.
 
 ## One-click Windows installer (recommended)
@@ -15,10 +19,14 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download `Oxford-to-Notion-Setup-1.2.0.exe`
+2. Download `Oxford-to-Notion-Setup-1.4.0.exe`
 3. Run the installer and follow the prompts
 4. Open `Oxford to Notion` from the desktop or Start menu
 5. Follow the five-step first-run wizard to configure and test Notion
+
+Use the language menu in the top-right corner to switch between Simplified Chinese and English. The app remembers your choice locally for the next launch.
+
+After a successful import, the main page shows the five most recent words; click one to open its Notion page. The app also checks GitHub quietly once per day and only shows a reminder when a newer release is available. It never installs updates automatically.
 
 The installer supports English and Simplified Chinese, an optional desktop shortcut, a Start menu entry, and normal Windows uninstall. Uninstalling the app does not automatically delete your Notion configuration.
 

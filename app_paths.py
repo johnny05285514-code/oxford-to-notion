@@ -16,6 +16,14 @@ def env_path() -> Path:
     return app_directory() / ".env"
 
 
+def history_path() -> Path:
+    return app_directory() / "history.json"
+
+
+def update_state_path() -> Path:
+    return app_directory() / "update-state.json"
+
+
 def resource_path(relative_path: str) -> Path:
     """Locate bundled read-only assets in source and PyInstaller builds."""
     if getattr(sys, "frozen", False):
