@@ -2,7 +2,7 @@ import sys
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app_paths import resource_path
 from exceptions import AppError
 from import_service import ImportResult, import_word
 from setup_wizard import ConnectionWorker, SetupWizard
@@ -176,6 +177,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.current_page_url = ""
 
         self.setWindowTitle("Oxford to Notion")
+        self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
         self.resize(720, 540)
         self.setMinimumSize(640, 500)
         self.setStyleSheet(APP_STYLE)
@@ -478,6 +480,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Oxford to Notion")
     app.setFont(build_ui_font())
+    app.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
     window = OxfordToNotionWindow()
     window.show()
     return app.exec()

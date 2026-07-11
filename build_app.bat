@@ -16,6 +16,8 @@ if not exist ".venv\Scripts\python.exe" (
     --clean ^
     --onefile ^
     --windowed ^
+    --icon "assets\app-icon.ico" ^
+    --add-data "assets\app-icon.png;assets" ^
     --name "Oxford to Notion" ^
     gui.py
 

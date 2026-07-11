@@ -1,5 +1,9 @@
 # Oxford to Notion
 
+<p align="center">
+  <img src="assets/app-icon.png" alt="Oxford to Notion 图标" width="128">
+</p>
+
 Languages: [简体中文](README.md) | [English](README.en.md)
 
 一个输入英文单词，自动查询 Oxford Learner's Dictionaries，并保存到 Notion 单词库的 Windows 桌面工具。
@@ -13,7 +17,7 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 普通用户不需要安装 Python，也不需要自己构建程序：
 
 1. 打开 [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. 下载 `Oxford-to-Notion-Setup-1.1.0.exe`
+2. 下载 `Oxford-to-Notion-Setup-1.2.0.exe`
 3. 双击安装包，按提示完成安装
 4. 从桌面或开始菜单打开 `Oxford to Notion`
 5. 第一次打开时按照五步向导完成 Notion 配置和连接测试

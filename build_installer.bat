@@ -30,7 +30,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "SETUP_FILE=release\Oxford-to-Notion-Setup-1.1.0.exe"
+set "SETUP_FILE=release\Oxford-to-Notion-Setup-1.2.0.exe"
 powershell -NoProfile -Command ^
   "$file = Get-Item '%SETUP_FILE%'; " ^
   "$hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower(); " ^

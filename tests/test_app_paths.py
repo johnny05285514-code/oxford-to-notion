@@ -12,3 +12,9 @@ def test_frozen_app_uses_windows_appdata(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("APPDATA", str(tmp_path))
 
     assert app_paths.app_directory() == tmp_path / "Oxford to Notion"
+
+
+def test_source_resource_path_uses_project_directory():
+    assert app_paths.resource_path("assets/app-icon.png") == (
+        Path(app_paths.__file__).resolve().parent / "assets" / "app-icon.png"
+    )

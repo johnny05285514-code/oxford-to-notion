@@ -4,7 +4,7 @@ Unicode True
 !include "Sections.nsh"
 
 !define APP_NAME "Oxford to Notion"
-!define APP_VERSION "1.1.0"
+!define APP_VERSION "1.2.0"
 !define APP_PUBLISHER "johnny05285514-code"
 !define APP_EXE "Oxford to Notion.exe"
 !define APP_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OxfordToNotion"
@@ -14,12 +14,14 @@ OutFile "release\Oxford-to-Notion-Setup-${APP_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\Oxford to Notion"
 InstallDirRegKey HKCU "${APP_REG_KEY}" "InstallLocation"
 RequestExecutionLevel user
+Icon "assets\app-icon.ico"
+UninstallIcon "assets\app-icon.ico"
 SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
 BrandingText "Oxford to Notion"
 
-VIProductVersion "1.1.0.0"
+VIProductVersion "1.2.0.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"

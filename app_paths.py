@@ -14,3 +14,12 @@ def app_directory() -> Path:
 
 def env_path() -> Path:
     return app_directory() / ".env"
+
+
+def resource_path(relative_path: str) -> Path:
+    """Locate bundled read-only assets in source and PyInstaller builds."""
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    else:
+        base = Path(__file__).resolve().parent
+    return base / relative_path
