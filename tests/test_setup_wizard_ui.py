@@ -9,6 +9,14 @@ from notion_connection import ConnectionResult
 from setup_wizard import SetupWizard
 
 
+class HoldingThreadPool:
+    def __init__(self):
+        self.worker = None
+
+    def start(self, worker):
+        self.worker = worker
+
+
 def make_wizard(completed):
     app = QApplication.instance() or QApplication([])
     wizard = SetupWizard(on_complete=lambda token, database: completed.append((token, database)))
@@ -109,4 +117,25 @@ def test_wizard_validation_message_uses_active_language():
     wizard.go_next()
 
     assert wizard.page_status.text() == "Please enter the Notion Integration Token first."
+    wizard.close()
+
+
+def test_stale_connection_success_cannot_approve_edited_credentials():
+    app = QApplication.instance() or QApplication([])
+    pool = HoldingThreadPool()
+    wizard = SetupWizard(
+        on_complete=lambda _token, _database: None,
+        thread_pool=pool,
+    )
+    wizard.token_entry.setText("tested-token")
+    wizard.database_entry.setText("tested-database")
+    wizard.start_connection_test()
+
+    wizard.token_entry.setText("edited-after-test-started")
+    wizard.finish_connection(ConnectionResult("tested-database", "data-source"))
+
+    assert not wizard.connection_passed
+    assert not wizard.finish_button.isEnabled()
+    assert "重新测试" in wizard.page_status.text()
+    assert pool.worker is not None
     wizard.close()

@@ -1,8 +1,10 @@
 from datetime import date
 
 import pytest
+import httpx
+from notion_client.errors import RequestTimeoutError
 
-from exceptions import NotionSchemaError
+from exceptions import NotionSchemaError, NotionWriteError
 from models import Definition, WordEntry
 from notion_writer import NotionWriter, build_blocks, build_properties, rich_text
 
@@ -28,6 +30,8 @@ class Endpoint:
         def call(**kwargs):
             self.calls.append((name, kwargs))
             response = self.responses.get(name, {})
+            if isinstance(response, Exception):
+                raise response
             return response(**kwargs) if callable(response) else response
         return call
 
@@ -97,6 +101,7 @@ def test_schema_validation_reports_wrong_and_missing_fields():
 
 def test_upsert_creates_new_page():
     client = FakeClient([])
+    _configure_managed_append(client)
 
     url = NotionWriter(client, "database-id", today=lambda: date(2026, 6, 21)).upsert(ENTRY)
 
@@ -104,21 +109,133 @@ def test_upsert_creates_new_page():
     name, kwargs = client.pages.calls[-1]
     assert name == "create"
     assert kwargs["parent"] == {"type": "data_source_id", "data_source_id": "data-source-id"}
-    assert kwargs["children"][0]["type"] == "heading_1"
+    assert "children" not in kwargs
+    first_append = client.blocks.children.calls[0]
+    assert first_append[1]["children"][0]["type"] == "toggle"
 
 
-def test_upsert_updates_existing_page_and_replaces_children():
+def test_upsert_updates_existing_page_without_deleting_unmanaged_children():
     client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
     client.blocks.children = Endpoint(
         list={"results": [{"id": "old-block"}], "has_more": False},
         append={},
     )
     client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
+    _configure_managed_append(client)
 
     url = NotionWriter(client, "database-id").upsert(ENTRY)
 
     assert url == "https://notion/existing"
-    assert ("delete", {"block_id": "old-block"}) in client.blocks.calls
+    assert ("delete", {"block_id": "old-block"}) not in client.blocks.calls
     assert client.blocks.children.calls[-1][0] == "append"
     update = next(kwargs for name, kwargs in client.pages.calls if name == "update")
     assert "Added Date" not in update["properties"]
+
+
+def _paragraph(block_id, text):
+    return {
+        "id": block_id,
+        "type": "paragraph",
+        "paragraph": {"rich_text": [{"plain_text": text}]},
+    }
+
+
+def _managed_toggle(block_id):
+    return {
+        "id": block_id,
+        "type": "toggle",
+        "toggle": {
+            "rich_text": [
+                {"plain_text": "Oxford content — managed by Oxford to Notion"}
+            ]
+        },
+    }
+
+
+def _configure_managed_append(client, *, child_error=None):
+    def append(**kwargs):
+        if kwargs["block_id"] in {"existing-page", "new-page"}:
+            return {"results": [{"id": "new-managed"}]}
+        if child_error is not None:
+            raise child_error
+        return {"results": []}
+
+    client.blocks.children.responses["append"] = append
+
+
+def test_repeat_import_preserves_every_unmanaged_legacy_block():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children = Endpoint(
+        list={
+            "results": [
+                _paragraph("legacy-oxford", "brutality noun"),
+                _paragraph("personal-note", "My own study note"),
+            ],
+            "has_more": False,
+        },
+        append={},
+    )
+    client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
+    _configure_managed_append(client)
+
+    NotionWriter(client, "database-id").upsert(ENTRY)
+
+    deleted_ids = {
+        kwargs["block_id"] for name, kwargs in client.blocks.calls if name == "delete"
+    }
+    assert "legacy-oxford" not in deleted_ids
+    assert "personal-note" not in deleted_ids
+
+
+def test_repeat_import_replaces_only_the_old_managed_container():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children = Endpoint(
+        list={
+            "results": [
+                _managed_toggle("old-managed"),
+                _paragraph("personal-note", "Keep this note"),
+            ],
+            "has_more": False,
+        },
+        append={},
+    )
+    client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
+    _configure_managed_append(client)
+
+    NotionWriter(client, "database-id").upsert(ENTRY)
+
+    deleted_ids = {
+        kwargs["block_id"] for name, kwargs in client.blocks.calls if name == "delete"
+    }
+    assert deleted_ids == {"old-managed"}
+
+
+def test_failed_replacement_keeps_old_managed_content():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children = Endpoint(
+        list={"results": [_managed_toggle("old-managed")], "has_more": False},
+        append={},
+    )
+    client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
+    _configure_managed_append(client, child_error=RequestTimeoutError())
+
+    with pytest.raises(NotionWriteError):
+        NotionWriter(client, "database-id").upsert(ENTRY)
+
+    deleted_ids = [
+        kwargs["block_id"] for name, kwargs in client.blocks.calls if name == "delete"
+    ]
+    assert "old-managed" not in deleted_ids
+
+
+def test_upsert_wraps_httpx_transport_errors():
+    request = httpx.Request("GET", "https://api.notion.com/v1/databases/test")
+    client = FakeClient([])
+    client.databases = Endpoint(
+        retrieve=httpx.ConnectError("offline endpoint detail", request=request)
+    )
+
+    with pytest.raises(NotionWriteError, match="Notion API request failed") as error:
+        NotionWriter(client, "database-id").upsert(ENTRY)
+
+    assert "endpoint detail" not in str(error.value)

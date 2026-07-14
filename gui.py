@@ -265,6 +265,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_adder = history_adder
         self.update_func = update_func
         self.update_info: UpdateInfo | None = None
+        self._settings_test_values: tuple[str, str] | None = None
         self.language = read_app_language() or detect_system_language()
         self.translator = Translator(self.language)
 
@@ -446,6 +447,7 @@ class OxfordToNotionWindow(QMainWindow):
         layout.addSpacing(6)
         self.token_entry = QLineEdit()
         self.token_entry.setEchoMode(QLineEdit.EchoMode.Password)
+        self.token_entry.textChanged.connect(self.invalidate_settings_connection)
         layout.addWidget(self.token_entry)
 
         self.show_token_checkbox = QCheckBox()
@@ -458,6 +460,7 @@ class OxfordToNotionWindow(QMainWindow):
         layout.addWidget(self.database_label)
         layout.addSpacing(6)
         self.database_entry = QLineEdit()
+        self.database_entry.textChanged.connect(self.invalidate_settings_connection)
         layout.addWidget(self.database_entry)
 
         layout.addSpacing(12)
@@ -553,6 +556,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.settings_status.clear()
         self._settings_status_key = None
         self._settings_error_source = None
+        self._settings_test_values = None
         self.settings_test_button.setEnabled(True)
         self.settings_test_button.setText(self.translator.text("test_connection"))
         self.stack.setCurrentWidget(self.settings_page)
@@ -708,6 +712,7 @@ class OxfordToNotionWindow(QMainWindow):
 
         self.settings_test_button.setEnabled(False)
         self.settings_test_button.setText(self.translator.text("testing"))
+        self._settings_test_values = (token, database)
         self.set_settings_status_key("checking_connection", "#64748b")
         worker = ConnectionWorker(token, database)
         worker.signals.succeeded.connect(self.finish_settings_connection_test)
@@ -718,16 +723,31 @@ class OxfordToNotionWindow(QMainWindow):
     def finish_settings_connection_test(self, _result) -> None:
         self.settings_test_button.setEnabled(True)
         self.settings_test_button.setText(self.translator.text("retest"))
+        submitted = self._settings_test_values
+        current = (
+            self.token_entry.text().strip(),
+            self.database_entry.text().strip(),
+        )
+        self._settings_test_values = None
+        if submitted is not None and current != submitted:
+            self.set_settings_status_key("connection_changed", "#b45309")
+            return
         self.set_settings_status_key("connection_success", "#15803d")
 
     @Slot(str)
     def fail_settings_connection_test(self, message: str) -> None:
+        self._settings_test_values = None
         self.settings_test_button.setEnabled(True)
         self.settings_test_button.setText(self.translator.text("retest"))
         self._settings_status_key = None
         self._settings_error_source = message
         self.settings_status.setText(localize_error(message, self.translator))
         self.settings_status.setStyleSheet("color: #b91c1c;")
+
+    @Slot()
+    def invalidate_settings_connection(self) -> None:
+        if self._settings_status_key == "connection_success":
+            self.set_settings_status_key("connection_changed", "#b45309")
 
     def set_settings_status_key(self, key: str, color: str) -> None:
         self._settings_status_key = key

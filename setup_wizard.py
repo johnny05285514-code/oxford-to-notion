@@ -95,6 +95,7 @@ class SetupWizard(QWidget):
         self.connection_func = connection_func
         self.thread_pool = thread_pool or QThreadPool(self)
         self.connection_passed = False
+        self._connection_test_values: tuple[str, str] | None = None
         self._status_key: str | None = None
         self._status_error_source: str | None = None
         self.translator = translator or Translator("zh-CN")
@@ -344,6 +345,7 @@ class SetupWizard(QWidget):
         self._status_key = None
         self._status_error_source = None
         self.set_values(token, database)
+        self._connection_test_values = None
         self.test_button.setEnabled(True)
         self.test_button.setText(self.translator.text("test_connection"))
         self.update_step()
@@ -357,6 +359,7 @@ class SetupWizard(QWidget):
             return
 
         self.connection_passed = False
+        self._connection_test_values = (token, database)
         self.finish_button.setEnabled(False)
         self.test_button.setEnabled(False)
         self.test_button.setText(self.translator.text("testing"))
@@ -372,6 +375,22 @@ class SetupWizard(QWidget):
 
     @Slot(object)
     def finish_connection(self, _result: ConnectionResult) -> None:
+        submitted = self._connection_test_values
+        current = (
+            self.token_entry.text().strip(),
+            self.database_entry.text().strip(),
+        )
+        self._connection_test_values = None
+        if submitted is not None and current != submitted:
+            self.connection_passed = False
+            self.test_button.setEnabled(True)
+            self.test_button.setText(self.translator.text("retest"))
+            self.finish_button.setEnabled(False)
+            self._status_key = "connection_changed"
+            self._status_error_source = None
+            self.page_status.setText(self.translator.text(self._status_key))
+            self.page_status.setStyleSheet("color: #b45309;")
+            return
         self.connection_passed = True
         self.test_button.setEnabled(True)
         self.test_button.setText(self.translator.text("retest"))
@@ -384,6 +403,7 @@ class SetupWizard(QWidget):
     @Slot(str)
     def fail_connection(self, message: str) -> None:
         self.connection_passed = False
+        self._connection_test_values = None
         self.test_button.setEnabled(True)
         self.test_button.setText(self.translator.text("retest"))
         self.finish_button.setEnabled(False)

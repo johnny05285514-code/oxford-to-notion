@@ -2,8 +2,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 from notion_client import Client
-from notion_client.errors import APIErrorCode, APIResponseError, RequestTimeoutError
+from notion_client.errors import (
+    APIErrorCode,
+    APIResponseError,
+    HTTPResponseError,
+    RequestTimeoutError,
+)
 
 from config import normalize_notion_database_id
 from exceptions import NotionConnectionError, NotionSchemaError
@@ -58,7 +64,7 @@ def check_notion_connection(
         raise NotionConnectionError(message) from exc
     except RequestTimeoutError as exc:
         raise NotionConnectionError("连接 Notion 超时，请检查网络后重试。") from exc
-    except OSError as exc:
+    except (httpx.RequestError, HTTPResponseError, OSError) as exc:
         raise NotionConnectionError("无法连接 Notion，请检查网络后重试。") from exc
 
     return ConnectionResult(database_id=database_id, data_source_id=data_source_id)
