@@ -2,7 +2,8 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any
 
-from notion_client.errors import APIResponseError, RequestTimeoutError
+import httpx
+from notion_client.errors import APIResponseError, HTTPResponseError, RequestTimeoutError
 
 from exceptions import NotionSchemaError, NotionWriteError
 from models import WordEntry
@@ -10,6 +11,7 @@ from models import WordEntry
 
 RICH_TEXT_LIMIT = 2000
 BLOCK_BATCH_SIZE = 100
+MANAGED_BLOCK_TITLE = "Oxford content — managed by Oxford to Notion"
 REQUIRED_SCHEMA = {
     "Name": "title",
     "Word": "rich_text",
@@ -77,6 +79,15 @@ def build_blocks(entry: WordEntry) -> list[dict[str, Any]]:
     return blocks
 
 
+def build_managed_container() -> dict[str, Any]:
+    """Return the marker block that owns only app-generated Oxford content."""
+    return {
+        "object": "block",
+        "type": "toggle",
+        "toggle": {"rich_text": rich_text(MANAGED_BLOCK_TITLE)},
+    }
+
+
 class NotionWriter:
     def __init__(
         self,
@@ -106,23 +117,39 @@ class NotionWriter:
             blocks = build_blocks(entry)
             if existing:
                 page = existing[0]
+                old_managed_ids = self._managed_child_ids(page["id"])
+                new_managed_id = self._append_managed_container(page["id"], blocks)
                 updated = self.client.pages.update(
                     page_id=page["id"],
                     properties=build_properties(entry),
                 )
-                self._replace_children(page["id"], blocks)
+                for block_id in old_managed_ids:
+                    if block_id != new_managed_id:
+                        self.client.blocks.delete(block_id=block_id)
                 return updated.get("url") or page.get("url") or page["id"]
 
             page = self.client.pages.create(
                 parent={"type": "data_source_id", "data_source_id": data_source_id},
                 properties=build_properties(entry, self.today()),
-                children=blocks[:BLOCK_BATCH_SIZE],
             )
-            self._append_batches(page["id"], blocks[BLOCK_BATCH_SIZE:])
+            try:
+                self._append_managed_container(page["id"], blocks)
+            except Exception:
+                try:
+                    self.client.pages.update(page_id=page["id"], archived=True)
+                except Exception:
+                    pass
+                raise
             return page.get("url") or page["id"]
         except NotionSchemaError:
             raise
-        except (APIResponseError, RequestTimeoutError, OSError) as exc:
+        except (
+            APIResponseError,
+            HTTPResponseError,
+            RequestTimeoutError,
+            httpx.RequestError,
+            OSError,
+        ) as exc:
             raise NotionWriteError("Notion API request failed. Check the token, database sharing, and permissions.") from exc
 
     def _resolve_data_source(self) -> tuple[str, dict[str, Any]]:
@@ -144,21 +171,59 @@ class NotionWriter:
         if problems:
             raise NotionSchemaError("Notion database schema mismatch: " + "; ".join(problems))
 
-    def _replace_children(self, page_id: str, blocks: list[dict[str, Any]]) -> None:
-        block_ids: list[str] = []
+    def _list_children(self, block_id: str) -> list[dict[str, Any]]:
+        blocks: list[dict[str, Any]] = []
         cursor = None
         while True:
-            kwargs = {"block_id": page_id, "page_size": 100}
+            kwargs = {"block_id": block_id, "page_size": 100}
             if cursor:
                 kwargs["start_cursor"] = cursor
             response = self.client.blocks.children.list(**kwargs)
-            block_ids.extend(block["id"] for block in response.get("results", []))
+            blocks.extend(response.get("results", []))
             if not response.get("has_more"):
                 break
             cursor = response.get("next_cursor")
-        for block_id in block_ids:
-            self.client.blocks.delete(block_id=block_id)
-        self._append_batches(page_id, blocks)
+        return blocks
+
+    @staticmethod
+    def _block_text(block: dict[str, Any]) -> str:
+        payload = block.get(block.get("type", ""), {})
+        parts = []
+        for item in payload.get("rich_text", []):
+            parts.append(
+                item.get("plain_text")
+                or item.get("text", {}).get("content", "")
+            )
+        return "".join(parts).strip()
+
+    def _managed_child_ids(self, page_id: str) -> list[str]:
+        return [
+            block["id"]
+            for block in self._list_children(page_id)
+            if block.get("type") == "toggle"
+            and self._block_text(block) == MANAGED_BLOCK_TITLE
+        ]
+
+    def _append_managed_container(
+        self, page_id: str, blocks: list[dict[str, Any]]
+    ) -> str:
+        response = self.client.blocks.children.append(
+            block_id=page_id,
+            children=[build_managed_container()],
+        )
+        results = response.get("results", [])
+        if not results or not results[0].get("id"):
+            raise NotionWriteError("Notion did not return the new managed content block.")
+        managed_id = results[0]["id"]
+        try:
+            self._append_batches(managed_id, blocks)
+        except Exception:
+            try:
+                self.client.blocks.delete(block_id=managed_id)
+            except Exception:
+                pass
+            raise
+        return managed_id
 
     def _append_batches(self, page_id: str, blocks: list[dict[str, Any]]) -> None:
         for index in range(0, len(blocks), BLOCK_BATCH_SIZE):

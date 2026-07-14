@@ -94,3 +94,19 @@ def test_connection_reports_timeout():
 
     with pytest.raises(NotionConnectionError, match="超时"):
         check_notion_connection("token", "database-id", client_factory=client_factory(client, []))
+
+
+def test_connection_reports_httpx_transport_failure_as_network_error():
+    request = httpx.Request("GET", "https://api.notion.com/v1/databases/private")
+    client = FakeClient(
+        database_response=httpx.ConnectError(
+            "private endpoint detail", request=request
+        )
+    )
+
+    with pytest.raises(NotionConnectionError, match="无法连接 Notion") as error:
+        check_notion_connection(
+            "token", "database-id", client_factory=client_factory(client, [])
+        )
+
+    assert "private endpoint" not in str(error.value)
