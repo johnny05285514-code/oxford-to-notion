@@ -10,12 +10,12 @@ import requests
 from app_paths import update_state_path as default_update_state_path
 
 
-CURRENT_VERSION = "1.4.1"
+CURRENT_VERSION = "1.4.2"
 RELEASES_API_URL = (
     "https://api.github.com/repos/johnny05285514-code/oxford-to-notion/releases/latest"
 )
 CHECK_INTERVAL = timedelta(hours=24)
-USER_AGENT = "Oxford-to-Notion/1.4.1 (+personal low-frequency learning use)"
+USER_AGENT = "Oxford-to-Notion/1.4.2 (+personal low-frequency learning use)"
 
 
 @dataclass(frozen=True, slots=True)

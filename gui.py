@@ -272,7 +272,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
         self.resize(720, 540)
-        self.setMinimumSize(640, 500)
+        self.setMinimumSize(640, 520)
         self.setStyleSheet(APP_STYLE)
 
         root = QWidget(objectName="root")
@@ -382,7 +382,10 @@ class OxfordToNotionWindow(QMainWindow):
         open_row.addStretch()
         open_row.addWidget(self.open_button)
         open_row.addStretch()
-        layout.addSpacing(10)
+        self.open_spacing = QWidget()
+        self.open_spacing.setFixedHeight(10)
+        self.open_spacing.hide()
+        layout.addWidget(self.open_spacing)
         layout.addLayout(open_row)
 
         self.update_banner = QFrame(objectName="updateBanner")
@@ -394,7 +397,10 @@ class OxfordToNotionWindow(QMainWindow):
         self.update_button.clicked.connect(self.open_update_page)
         update_layout.addWidget(self.update_label, 1)
         update_layout.addWidget(self.update_button)
-        layout.addSpacing(12)
+        self.update_spacing = QWidget()
+        self.update_spacing.setFixedHeight(12)
+        self.update_spacing.hide()
+        layout.addWidget(self.update_spacing)
         layout.addWidget(self.update_banner)
         self.update_banner.hide()
 
@@ -411,7 +417,10 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_grid.setVerticalSpacing(8)
         history_layout.addLayout(self.history_grid)
         self.history_buttons: list[QPushButton] = []
-        layout.addSpacing(14)
+        self.history_spacing = QWidget()
+        self.history_spacing.setFixedHeight(8)
+        self.history_spacing.hide()
+        layout.addWidget(self.history_spacing)
         layout.addWidget(self.history_section)
         self.history_section.hide()
 
@@ -587,6 +596,7 @@ class OxfordToNotionWindow(QMainWindow):
 
         self.current_page_url = ""
         self.open_button.hide()
+        self.open_spacing.hide()
         self.word_entry.setEnabled(False)
         self.import_button.setEnabled(False)
         self.import_button.setText(self.translator.text("importing"))
@@ -602,6 +612,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.set_ready()
         self.current_page_url = result.page_url
         self.set_status_key("import_success", "#15803d", success=True, word=result.word)
+        self.open_spacing.show()
         self.open_button.show()
         items = self.history_adder(result.word, result.page_url)
         self.refresh_history(items)
@@ -666,7 +677,9 @@ class OxfordToNotionWindow(QMainWindow):
             )
             self.history_grid.addWidget(button, index // 3, index % 3)
             self.history_buttons.append(button)
-        self.history_section.setVisible(bool(self.history_buttons))
+        has_history = bool(self.history_buttons)
+        self.history_spacing.setVisible(has_history)
+        self.history_section.setVisible(has_history)
 
     @Slot()
     def start_update_check(self) -> None:
@@ -678,12 +691,14 @@ class OxfordToNotionWindow(QMainWindow):
     def show_update(self, info: UpdateInfo | None) -> None:
         self.update_info = info
         if info is None:
+            self.update_spacing.hide()
             self.update_banner.hide()
             return
         self.update_label.setText(
             self.translator.text("update_available", version=info.version)
         )
         self.update_button.setText(self.translator.text("view_update"))
+        self.update_spacing.show()
         self.update_banner.show()
 
     @Slot()

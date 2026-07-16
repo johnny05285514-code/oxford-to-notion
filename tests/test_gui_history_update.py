@@ -66,6 +66,24 @@ def test_history_buttons_show_five_items_and_open_notion(monkeypatch):
     window.close()
 
 
+def test_second_history_row_is_visible_at_minimum_window_size(monkeypatch):
+    history = [item(word) for word in ["fraternize", "banana", "add", "apple"]]
+    app, window = make_window(monkeypatch, history=history)
+
+    window.resize(window.minimumSize())
+    window.show()
+    app.processEvents()
+
+    last_button = window.history_buttons[-1]
+    button_bottom = last_button.mapTo(
+        window.history_section,
+        last_button.rect().bottomLeft(),
+    ).y()
+
+    assert button_bottom < window.history_section.height()
+    window.close()
+
+
 def test_successful_import_persists_and_refreshes_history(monkeypatch):
     current = []
 

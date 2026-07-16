@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## v1.4.2 — 2026-07-16
+
+### 简体中文
+
+- 修复“最近导入”出现第二行时，最小窗口高度下按钮被底部裁切的问题。
+- 隐藏“打开 Notion”和更新提醒时，其对应空白区域现在会一起隐藏，为历史记录保留完整空间。
+- 窗口最小高度增加少量安全余量，以适应 Windows 字体和显示缩放差异。
+
+### English
+
+- Fixed the second row of recent imports being clipped at the minimum window height.
+- Hidden Open Notion and update controls no longer leave unused spacing behind, preserving room for import history.
+- Added a small minimum-height safety margin for Windows font and display-scaling differences.
+
 ## v1.4.1 — 2026-07-14
 
 ### 简体中文
