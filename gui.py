@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, QTimer, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
@@ -271,8 +271,8 @@ class OxfordToNotionWindow(QMainWindow):
 
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
-        self.resize(720, 560)
-        self.setMinimumSize(640, 560)
+        self.resize(720, 600)
+        self.setMinimumSize(640, 600)
         self.setStyleSheet(APP_STYLE)
 
         root = QWidget(objectName="root")
@@ -618,6 +618,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.refresh_history(items)
         self.word_entry.clear()
         self.word_entry.setFocus()
+        self.schedule_content_fit()
 
     @Slot(str)
     def finish_error(self, message: str) -> None:
@@ -681,6 +682,14 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_spacing.setVisible(has_history)
         self.history_section.setVisible(has_history)
 
+    def schedule_content_fit(self) -> None:
+        QTimer.singleShot(0, self.grow_window_to_fit_content)
+
+    def grow_window_to_fit_content(self) -> None:
+        required_height = self.sizeHint().height()
+        if required_height > self.height():
+            self.resize(self.width(), required_height)
+
     @Slot()
     def start_update_check(self) -> None:
         worker = UpdateWorker(self.update_func)
@@ -700,6 +709,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.update_button.setText(self.translator.text("view_update"))
         self.update_spacing.show()
         self.update_banner.show()
+        self.schedule_content_fit()
 
     @Slot()
     def open_update_page(self) -> None:

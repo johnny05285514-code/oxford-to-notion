@@ -86,6 +86,37 @@ def test_second_history_row_has_bottom_clearance_at_minimum_window_size(monkeypa
     window.close()
 
 
+def test_success_controls_fit_without_resizing_or_clipping_history(monkeypatch):
+    history = [
+        item(word)
+        for word in ["predispose", "assassinate", "propagandist", "fraternize", "banana"]
+    ]
+    app, window = make_window(
+        monkeypatch,
+        history=history,
+        history_adder=lambda _word, _url: history,
+    )
+    window.resize(window.minimumSize())
+    window.show()
+    app.processEvents()
+    initial_height = window.height()
+
+    window.finish_success(ImportResult("predispose", "https://www.notion.so/predispose"))
+    app.processEvents()
+
+    last_button = window.history_buttons[-1]
+    button_bottom = last_button.mapTo(
+        window.history_section,
+        last_button.rect().bottomLeft(),
+    ).y()
+    bottom_clearance = window.history_section.height() - button_bottom - 1
+
+    assert window.height() == initial_height
+    assert window.height() >= window.sizeHint().height()
+    assert bottom_clearance >= 8
+    window.close()
+
+
 def test_successful_import_persists_and_refreshes_history(monkeypatch):
     current = []
 

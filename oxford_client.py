@@ -45,7 +45,7 @@ class OxfordClient:
         self.sleep = sleep
         self.session.headers.update(
             {
-                "User-Agent": "Oxford-to-Notion/1.4.3 (+low-frequency personal use)",
+                "User-Agent": "Oxford-to-Notion/1.4.4 (+low-frequency personal use)",
                 "Accept-Language": "en-GB,en;q=0.9",
             }
         )

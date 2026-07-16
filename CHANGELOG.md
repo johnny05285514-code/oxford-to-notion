@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## v1.4.4 — 2026-07-16
+
+### 简体中文
+
+- 修复导入成功后，“在 Notion 中打开”按钮出现并再次压缩最近导入列表的问题。
+- 默认及最小窗口高度调整为 600 像素，正常导入过程中窗口保持稳定，不会来回改变大小。
+- 保留按内容自动增高作为极少数额外提示同时出现时的兜底，避免未来再次裁切。
+- 新增成功状态下两行历史记录保持完整且窗口高度稳定的界面回归测试。
+
+### English
+
+- Fixed recent imports being compressed again when the Open in Notion button appears after a successful import.
+- Set the default and minimum window height to 600 pixels so normal imports do not resize the window.
+- Kept content-aware growth only as a fallback when multiple optional notices appear at once.
+- Added a GUI regression test covering stable window height and two complete history rows in the success state.
+
 ## v1.4.3 — 2026-07-16
 
 ### 简体中文
