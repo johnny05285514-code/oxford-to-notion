@@ -271,8 +271,8 @@ class OxfordToNotionWindow(QMainWindow):
 
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
-        self.resize(720, 540)
-        self.setMinimumSize(640, 520)
+        self.resize(720, 560)
+        self.setMinimumSize(640, 560)
         self.setStyleSheet(APP_STYLE)
 
         root = QWidget(objectName="root")
@@ -406,7 +406,7 @@ class OxfordToNotionWindow(QMainWindow):
 
         self.history_section = QWidget()
         history_layout = QVBoxLayout(self.history_section)
-        history_layout.setContentsMargins(0, 0, 0, 0)
+        history_layout.setContentsMargins(0, 0, 0, 8)
         history_layout.setSpacing(8)
         self.history_title = QLabel(objectName="subtitle")
         self.history_title.setStyleSheet("font-weight: 600;")

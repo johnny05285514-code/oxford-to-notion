@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## v1.4.3 — 2026-07-16
+
+### 简体中文
+
+- 为“最近导入”第二行增加明确的 8 像素底部安全留白，避免按钮边框被裁切。
+- 将窗口默认高度和最小高度调整为 560 像素，以适应 Windows 实际字体与显示缩放。
+- 新增界面回归测试，要求最小窗口下仍保留底部安全距离。
+
+### English
+
+- Added an explicit 8-pixel bottom safety margin below the second recent-import row so button borders are not clipped.
+- Increased the default and minimum window height to 560 pixels for real Windows font and display scaling.
+- Added a GUI regression test that requires bottom clearance at the minimum window size.
+
 ## v1.4.2 — 2026-07-16
 
 ### 简体中文

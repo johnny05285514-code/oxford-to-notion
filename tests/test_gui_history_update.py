@@ -66,7 +66,7 @@ def test_history_buttons_show_five_items_and_open_notion(monkeypatch):
     window.close()
 
 
-def test_second_history_row_is_visible_at_minimum_window_size(monkeypatch):
+def test_second_history_row_has_bottom_clearance_at_minimum_window_size(monkeypatch):
     history = [item(word) for word in ["fraternize", "banana", "add", "apple"]]
     app, window = make_window(monkeypatch, history=history)
 
@@ -80,7 +80,9 @@ def test_second_history_row_is_visible_at_minimum_window_size(monkeypatch):
         last_button.rect().bottomLeft(),
     ).y()
 
-    assert button_bottom < window.history_section.height()
+    bottom_clearance = window.history_section.height() - button_bottom - 1
+
+    assert bottom_clearance >= 8
     window.close()
 
 
