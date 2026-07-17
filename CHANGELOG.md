@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## v1.4.5 — 2026-07-17
+
+### 简体中文
+
+- 直接词条不存在时，使用 Oxford 官方搜索进行一次回退查询。
+- 支持将 `emitted` 自动解析为 `emit`、将 `predisposed` 自动解析为 `predispose` 等 Oxford 能识别的词形变化。
+- 原本可直接查询的词仍只请求一次；不存在的词仍会显示友好的未找到提示。
+- 不在本地猜测或裁剪词尾，原形匹配结果完全由 Oxford 官方搜索决定。
+
+### English
+
+- Added a single Oxford search fallback when a direct dictionary entry does not exist.
+- Inflected forms recognized by Oxford, such as `emitted` → `emit` and `predisposed` → `predispose`, now import their canonical entries.
+- Direct entries still use one request, while genuinely missing words retain the friendly not-found message.
+- The app does not guess stems locally; canonical matching is determined by Oxford's official search.
+
 ## v1.4.4 — 2026-07-16
 
 ### 简体中文

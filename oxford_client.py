@@ -15,6 +15,7 @@ from parser import parse_entry
 
 
 BASE_URL = "https://www.oxfordlearnersdictionaries.com/definition/english/"
+SEARCH_URL = "https://www.oxfordlearnersdictionaries.com/search/english/direct/?q="
 WORD_PATTERN = re.compile(r"^[A-Za-z]+(?:[-'][A-Za-z]+)*$")
 BLOCK_MARKERS = (
     "enable javascript and cookies to continue",
@@ -45,44 +46,60 @@ class OxfordClient:
         self.sleep = sleep
         self.session.headers.update(
             {
-                "User-Agent": "Oxford-to-Notion/1.4.4 (+low-frequency personal use)",
+                "User-Agent": "Oxford-to-Notion/1.4.5 (+low-frequency personal use)",
                 "Accept-Language": "en-GB,en;q=0.9",
             }
         )
 
     def lookup(self, word: str) -> WordEntry:
         normalized = normalize_word(word)
-        url = BASE_URL + quote(normalized, safe="-'")
+        urls = (
+            BASE_URL + quote(normalized, safe="-'"),
+            SEARCH_URL + quote(normalized, safe=""),
+        )
 
-        for attempt in range(self.max_attempts):
-            try:
-                response = self.session.get(url, timeout=self.timeout)
-            except requests.RequestException as exc:
-                if attempt + 1 < self.max_attempts:
-                    self.sleep(0.5 * (2**attempt))
-                    continue
-                raise OxfordNetworkError("Oxford request failed after retrying.") from exc
+        for url_index, url in enumerate(urls):
+            for attempt in range(self.max_attempts):
+                try:
+                    response = self.session.get(url, timeout=self.timeout)
+                except requests.RequestException as exc:
+                    if attempt + 1 < self.max_attempts:
+                        self.sleep(0.5 * (2**attempt))
+                        continue
+                    raise OxfordNetworkError("Oxford request failed after retrying.") from exc
 
-            if response.status_code == 404:
-                raise WordNotFoundError(f"Oxford has no entry for '{normalized}'.")
-            if response.status_code == 429 or 500 <= response.status_code < 600:
-                if attempt + 1 < self.max_attempts:
-                    self.sleep(0.5 * (2**attempt))
-                    continue
-                raise OxfordNetworkError(f"Oxford returned HTTP {response.status_code} after retrying.")
-            if response.status_code in (401, 403):
-                raise OxfordBlockedError("Oxford refused the request; access may require a browser.")
-            if not 200 <= response.status_code < 300:
-                raise OxfordNetworkError(f"Oxford returned unexpected HTTP {response.status_code}.")
-
-            lowered = response.text.lower()
-            if any(marker in lowered for marker in BLOCK_MARKERS):
-                raise OxfordBlockedError("Oxford returned an access challenge instead of a dictionary entry.")
-            try:
-                return parse_entry(response.text, response.url or url)
-            except OxfordStructureError:
-                if "did you mean" in lowered or "no exact matches" in lowered:
+                if response.status_code == 404:
+                    if url_index == 0:
+                        break
                     raise WordNotFoundError(f"Oxford has no entry for '{normalized}'.")
-                raise
+                if response.status_code == 429 or 500 <= response.status_code < 600:
+                    if attempt + 1 < self.max_attempts:
+                        self.sleep(0.5 * (2**attempt))
+                        continue
+                    raise OxfordNetworkError(
+                        f"Oxford returned HTTP {response.status_code} after retrying."
+                    )
+                if response.status_code in (401, 403):
+                    raise OxfordBlockedError(
+                        "Oxford refused the request; access may require a browser."
+                    )
+                if not 200 <= response.status_code < 300:
+                    raise OxfordNetworkError(
+                        f"Oxford returned unexpected HTTP {response.status_code}."
+                    )
+
+                lowered = response.text.lower()
+                if any(marker in lowered for marker in BLOCK_MARKERS):
+                    raise OxfordBlockedError(
+                        "Oxford returned an access challenge instead of a dictionary entry."
+                    )
+                try:
+                    return parse_entry(response.text, response.url or url)
+                except OxfordStructureError:
+                    if "did you mean" in lowered or "no exact matches" in lowered:
+                        raise WordNotFoundError(
+                            f"Oxford has no entry for '{normalized}'."
+                        )
+                    raise
 
         raise OxfordNetworkError("Oxford request failed.")

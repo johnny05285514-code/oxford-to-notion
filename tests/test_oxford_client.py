@@ -8,6 +8,7 @@ from oxford_client import OxfordClient
 
 
 HTML = (Path(__file__).parent / "fixtures" / "brutality_excerpt.html").read_text(encoding="utf-8")
+EMIT_HTML = HTML.replace("brutality", "emit", 1)
 
 
 class FakeResponse:
@@ -38,7 +39,7 @@ def test_lookup_builds_safe_url_and_sets_user_agent():
     entry = client.lookup("Brutality")
 
     assert session.calls[0][0].endswith("/definition/english/brutality")
-    assert "Oxford-to-Notion/1.4.4" in session.headers["User-Agent"]
+    assert "Oxford-to-Notion/1.4.5" in session.headers["User-Agent"]
     assert entry.word == "brutality"
 
 
@@ -52,10 +53,31 @@ def test_lookup_rejects_invalid_word_before_request():
 
 
 def test_lookup_reports_not_found():
-    client = OxfordClient(session=FakeSession([FakeResponse(status_code=404)]), sleep=lambda _: None)
+    client = OxfordClient(
+        session=FakeSession([FakeResponse(status_code=404), FakeResponse(status_code=404)]),
+        sleep=lambda _: None,
+    )
 
     with pytest.raises(WordNotFoundError):
         client.lookup("nonexistentword")
+
+
+def test_lookup_uses_oxford_search_to_resolve_inflected_form():
+    session = FakeSession(
+        [
+            FakeResponse(status_code=404),
+            FakeResponse(
+                text=EMIT_HTML,
+                url="https://www.oxfordlearnersdictionaries.com/definition/english/emit?q=emitted",
+            ),
+        ]
+    )
+    client = OxfordClient(session=session, sleep=lambda _: None)
+
+    entry = client.lookup("emitted")
+
+    assert entry.word == "emit"
+    assert session.calls[1][0].endswith("/search/english/direct/?q=emitted")
 
 
 def test_lookup_detects_access_challenge():

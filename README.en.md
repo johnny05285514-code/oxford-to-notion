@@ -21,7 +21,7 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download `Oxford-to-Notion-Setup-1.4.4.exe`
+2. Download `Oxford-to-Notion-Setup-1.4.5.exe`
 3. Run the installer and follow the prompts
 4. Open `Oxford to Notion` from the desktop or Start menu
 5. Follow the five-step first-run wizard to configure and test Notion
