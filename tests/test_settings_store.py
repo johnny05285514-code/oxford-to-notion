@@ -1,9 +1,17 @@
 from pathlib import Path
 
 import pytest
+from dotenv import dotenv_values
 
 from exceptions import ConfigurationError
-from settings_store import read_notion_settings, save_notion_settings
+from settings_store import (
+    HISTORY_LINK_TARGET_NOTION,
+    HISTORY_LINK_TARGET_OXFORD,
+    read_history_link_target,
+    read_notion_settings,
+    save_history_link_target,
+    save_notion_settings,
+)
 
 
 def test_save_and_read_notion_settings(tmp_path: Path):
@@ -39,3 +47,37 @@ def test_save_preserves_unrelated_env_values(tmp_path: Path):
 def test_save_rejects_missing_values(tmp_path: Path, token, database, missing_name):
     with pytest.raises(ConfigurationError, match=missing_name):
         save_notion_settings(token, database, env_path=tmp_path / ".env")
+
+
+def test_history_link_target_defaults_to_notion(tmp_path: Path):
+    assert (
+        read_history_link_target(env_path=tmp_path / ".env")
+        == HISTORY_LINK_TARGET_NOTION
+    )
+
+
+def test_history_link_target_round_trips_and_preserves_credentials(tmp_path: Path):
+    path = tmp_path / ".env"
+    path.write_text(
+        "NOTION_TOKEN=secret-value\nNOTION_DATABASE_ID=database-value\n",
+        encoding="utf-8",
+    )
+
+    save_history_link_target(HISTORY_LINK_TARGET_OXFORD, env_path=path)
+
+    assert read_history_link_target(env_path=path) == HISTORY_LINK_TARGET_OXFORD
+    values = dotenv_values(path)
+    assert values["NOTION_TOKEN"] == "secret-value"
+    assert values["NOTION_DATABASE_ID"] == "database-value"
+
+
+def test_invalid_saved_history_link_target_falls_back_to_notion(tmp_path: Path):
+    path = tmp_path / ".env"
+    path.write_text("HISTORY_LINK_TARGET=unknown\n", encoding="utf-8")
+
+    assert read_history_link_target(env_path=path) == HISTORY_LINK_TARGET_NOTION
+
+
+def test_rejects_invalid_history_link_target(tmp_path: Path):
+    with pytest.raises(ConfigurationError, match="Unsupported history link target"):
+        save_history_link_target("unknown", env_path=tmp_path / ".env")

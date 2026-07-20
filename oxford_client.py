@@ -32,6 +32,11 @@ def normalize_word(word: str) -> str:
     return normalized
 
 
+def build_oxford_search_url(word: str) -> str:
+    normalized = normalize_word(word)
+    return SEARCH_URL + quote(normalized, safe="")
+
+
 class OxfordClient:
     def __init__(
         self,
@@ -55,7 +60,7 @@ class OxfordClient:
         normalized = normalize_word(word)
         urls = (
             BASE_URL + quote(normalized, safe="-'"),
-            SEARCH_URL + quote(normalized, safe=""),
+            build_oxford_search_url(normalized),
         )
 
         for url_index, url in enumerate(urls):

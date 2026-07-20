@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from exceptions import OxfordBlockedError, OxfordNetworkError, WordNotFoundError
-from oxford_client import OxfordClient
+from oxford_client import OxfordClient, build_oxford_search_url
 
 
 HTML = (Path(__file__).parent / "fixtures" / "brutality_excerpt.html").read_text(encoding="utf-8")
@@ -78,6 +78,12 @@ def test_lookup_uses_oxford_search_to_resolve_inflected_form():
 
     assert entry.word == "emit"
     assert session.calls[1][0].endswith("/search/english/direct/?q=emitted")
+
+
+def test_build_oxford_search_url_normalizes_and_encodes_the_word():
+    assert build_oxford_search_url("  Mother's  ") == (
+        "https://www.oxfordlearnersdictionaries.com/search/english/direct/?q=mother%27s"
+    )
 
 
 def test_lookup_detects_access_challenge():

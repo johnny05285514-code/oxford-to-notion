@@ -9,6 +9,14 @@ from exceptions import ConfigurationError
 from i18n import SUPPORTED_LANGUAGE_CODES
 
 
+HISTORY_LINK_TARGET_NOTION = "notion"
+HISTORY_LINK_TARGET_OXFORD = "oxford"
+HISTORY_LINK_TARGETS = {
+    HISTORY_LINK_TARGET_NOTION,
+    HISTORY_LINK_TARGET_OXFORD,
+}
+
+
 @dataclass(frozen=True, slots=True)
 class StoredNotionSettings:
     notion_token: str
@@ -72,3 +80,26 @@ def save_app_language(language: str, *, env_path: Path | None = None) -> None:
     if not path.exists():
         path.touch()
     set_key(str(path), "APP_LANGUAGE", language)
+
+
+def read_history_link_target(*, env_path: Path | None = None) -> str:
+    path = env_path or default_env_path()
+    values = dotenv_values(path) if path.exists() else {}
+    target = (values.get("HISTORY_LINK_TARGET") or "").strip().lower()
+    return target if target in HISTORY_LINK_TARGETS else HISTORY_LINK_TARGET_NOTION
+
+
+def save_history_link_target(
+    target: str,
+    *,
+    env_path: Path | None = None,
+) -> None:
+    normalized = target.strip().lower()
+    if normalized not in HISTORY_LINK_TARGETS:
+        raise ConfigurationError(f"Unsupported history link target: {target}")
+
+    path = env_path or default_env_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.touch()
+    set_key(str(path), "HISTORY_LINK_TARGET", normalized)
