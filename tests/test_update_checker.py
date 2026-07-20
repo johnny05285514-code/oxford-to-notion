@@ -49,7 +49,7 @@ def release(version="v1.5.0", **overrides):
 
 
 def test_version_parser_accepts_v_prefix_and_rejects_invalid_values():
-    assert CURRENT_VERSION == "1.4.5"
+    assert CURRENT_VERSION == "1.4.6"
     assert parse_version("v1.4.2") == (1, 4, 2)
     assert parse_version("1.5") == (1, 5, 0)
     assert parse_version("latest") is None

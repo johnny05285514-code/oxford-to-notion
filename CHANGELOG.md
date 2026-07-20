@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## v1.4.6 — 2026-07-21
+
+### 简体中文
+
+- 在“设置”中新增“最近导入打开方式”，可以选择 Notion 或 Oxford Learner's Dictionaries。
+- 选择会立即应用到以前和以后导入的记录，无需迁移历史数据。
+- 导入成功后的主按钮仍然打开刚创建或更新的 Notion 页面。
+- 修复英文成功提示换行后，最近导入列表与底部说明发生重叠或裁切的问题。
+
+### English
+
+- Added a Settings preference for opening recent imports in Notion or Oxford Learner's Dictionaries.
+- The choice applies immediately to both existing and future history items without migrating history data.
+- The primary success action still opens the newly created or updated Notion page.
+- Fixed recent-history and footer overlap caused by the English success message wrapping.
+
 ## v1.4.5 — 2026-07-17
 
 ### 简体中文

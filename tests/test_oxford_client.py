@@ -39,7 +39,7 @@ def test_lookup_builds_safe_url_and_sets_user_agent():
     entry = client.lookup("Brutality")
 
     assert session.calls[0][0].endswith("/definition/english/brutality")
-    assert "Oxford-to-Notion/1.4.5" in session.headers["User-Agent"]
+    assert "Oxford-to-Notion/1.4.6" in session.headers["User-Agent"]
     assert entry.word == "brutality"
 
 

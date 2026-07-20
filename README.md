@@ -23,14 +23,14 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 普通用户不需要安装 Python，也不需要自己构建程序：
 
 1. 打开 [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. 下载 `Oxford-to-Notion-Setup-1.4.5.exe`
+2. 下载 `Oxford-to-Notion-Setup-1.4.6.exe`
 3. 双击安装包，按提示完成安装
 4. 从桌面或开始菜单打开 `Oxford to Notion`
 5. 第一次打开时按照五步向导完成 Notion 配置和连接测试
 
 软件右上角提供语言菜单，可随时在简体中文和 English 之间切换。选择会自动保存在本机，下次打开继续使用。
 
-导入成功后，主界面会显示最近 5 个单词；点击即可打开对应的 Notion 页面。软件还会每天静默检查一次 GitHub 新版本，仅在发现更新时提醒，不会自动下载安装。
+导入成功后，主界面会显示最近 5 个单词。在“设置”中可以选择点击这些单词时打开对应的 Notion 页面，或者跳转到 Oxford Learner's Dictionaries；这个选择对以前和以后导入的记录都有效。软件还会每天静默检查一次 GitHub 新版本，仅在发现更新时提醒，不会自动下载安装。
 
 从 v1.4.1 开始，程序生成的 Oxford 正文会放在明确标记的管理区域内。重复导入只会替换这个区域，不会删除你在区域外添加的个人笔记。旧版本页面第一次重新导入时会保留全部旧正文并新增安全管理区域，因此 Oxford 内容可能暂时出现两份；确认新内容后可手动删除旧的 Oxford 段落。
 

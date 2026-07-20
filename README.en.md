@@ -21,14 +21,14 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download `Oxford-to-Notion-Setup-1.4.5.exe`
+2. Download `Oxford-to-Notion-Setup-1.4.6.exe`
 3. Run the installer and follow the prompts
 4. Open `Oxford to Notion` from the desktop or Start menu
 5. Follow the five-step first-run wizard to configure and test Notion
 
 Use the language menu in the top-right corner to switch between Simplified Chinese and English. The app remembers your choice locally for the next launch.
 
-After a successful import, the main page shows the five most recent words; click one to open its Notion page. The app also checks GitHub quietly once per day and only shows a reminder when a newer release is available. It never installs updates automatically.
+After a successful import, the main page shows the five most recent words. In Settings, choose whether those words open their Notion pages or Oxford Learner's Dictionaries; the choice applies to both old and new history items. The app also checks GitHub quietly once per day and only shows a reminder when a newer release is available. It never installs updates automatically.
 
 Starting with v1.4.1, generated Oxford page content lives inside a clearly marked managed section. Repeat imports replace only that section and never delete personal notes added outside it. The first repeat import of a legacy page preserves all old body content and adds the safe managed section, so Oxford content may temporarily appear twice; after checking the new section, you may remove the old Oxford paragraphs manually.
 
