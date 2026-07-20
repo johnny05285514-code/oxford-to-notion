@@ -27,6 +27,7 @@ def make_window(
         lambda: StoredNotionSettings("token", "database"),
     )
     monkeypatch.setattr(gui, "read_app_language", lambda: "zh-CN")
+    monkeypatch.setattr(gui, "save_app_language", lambda _language: None)
     monkeypatch.setattr(gui, "read_history_link_target", lambda: history_link_target)
     saved_targets = []
     monkeypatch.setattr(gui, "save_history_link_target", saved_targets.append)
@@ -244,4 +245,64 @@ def test_success_button_still_opens_notion_when_history_target_is_oxford(monkeyp
     window.open_button.click()
 
     assert opened == ["https://www.notion.so/emit"]
+    window.close()
+
+
+def test_english_success_history_and_footer_do_not_overlap(monkeypatch):
+    history = [
+        item(word)
+        for word in [
+            "predispose",
+            "assassinate",
+            "propagandist",
+            "formidable",
+            "attitudinal",
+        ]
+    ]
+    app, window, _saved = make_window(
+        monkeypatch,
+        history=history,
+        history_adder=lambda _word, _url: history,
+    )
+    window.set_language("en")
+    window.resize(window.minimumSize())
+    window.show()
+    app.processEvents()
+
+    window.finish_success(ImportResult("predispose", "https://www.notion.so/predispose"))
+    app.processEvents()
+
+    rendered_text_width = window.status_label.fontMetrics().horizontalAdvance(
+        window.status_label.text()
+    )
+    last_button = window.history_buttons[-1]
+    history_bottom = last_button.mapTo(window, last_button.rect().bottomLeft()).y()
+    footer_top = window.footer_label.mapTo(
+        window,
+        window.footer_label.rect().topLeft(),
+    ).y()
+    footer_bottom = window.footer_label.mapTo(
+        window,
+        window.footer_label.rect().bottomLeft(),
+    ).y()
+    content_bottom = window.centralWidget().mapTo(
+        window,
+        window.centralWidget().rect().bottomLeft(),
+    ).y()
+
+    assert rendered_text_width <= window.status_label.width()
+    assert footer_top - history_bottom >= 8
+    assert footer_bottom <= content_bottom
+    window.close()
+
+
+def test_language_change_and_history_refresh_schedule_content_fit(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    calls = []
+    window.schedule_content_fit = lambda: calls.append("fit")
+
+    window.set_language("en")
+    window.refresh_history([item("brutality")])
+
+    assert calls == ["fit", "fit"]
     window.close()

@@ -369,6 +369,7 @@ class OxfordToNotionWindow(QMainWindow):
         self._status_values: dict[str, object] = {}
         self._status_error_source: str | None = None
         self.status_label.setWordWrap(True)
+        self.status_label.setMinimumWidth(440)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.success_icon = SuccessIcon()
         self.success_icon.hide()
@@ -526,6 +527,7 @@ class OxfordToNotionWindow(QMainWindow):
             save_app_language(self.language)
         except AppError:
             self.set_status(self.translator.text("language_save_warning"), "#b45309")
+        self.schedule_content_fit()
 
     def retranslate_ui(self) -> None:
         text = self.translator.text
@@ -716,6 +718,7 @@ class OxfordToNotionWindow(QMainWindow):
         has_history = bool(self.history_buttons)
         self.history_spacing.setVisible(has_history)
         self.history_section.setVisible(has_history)
+        self.schedule_content_fit()
 
     def schedule_content_fit(self) -> None:
         QTimer.singleShot(0, self.grow_window_to_fit_content)
