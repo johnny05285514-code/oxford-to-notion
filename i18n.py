@@ -18,6 +18,11 @@ SUPPORTED_LANGUAGE_CODES = frozenset(language.code for language in SUPPORTED_LAN
 
 
 ENGLISH_MESSAGES = {
+    "history_target_label": "Open recent imports in",
+    "history_target_notion": "Notion",
+    "history_target_oxford": "Oxford Learner's Dictionaries",
+    "open_history_item_notion": "Open {word} in Notion",
+    "open_history_item_oxford": "Open {word} in Oxford Learner's Dictionaries",
     "language_button": "🌐 English",
     "language_tooltip": "Language",
     "settings": "Settings",
@@ -94,6 +99,11 @@ ENGLISH_MESSAGES = {
 }
 
 CHINESE_MESSAGES = {
+    "history_target_label": "最近导入打开方式",
+    "history_target_notion": "Notion",
+    "history_target_oxford": "Oxford Learner's Dictionaries",
+    "open_history_item_notion": "在 Notion 中打开 {word}",
+    "open_history_item_oxford": "在 Oxford Learner's Dictionaries 中打开 {word}",
     "language_button": "🌐 中文",
     "language_tooltip": "切换语言",
     "settings": "设置",

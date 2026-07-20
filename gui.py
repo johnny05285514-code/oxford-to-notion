@@ -14,6 +14,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -36,11 +37,16 @@ from i18n import (
 from import_service import ImportResult, import_word
 from history_store import ImportHistoryItem, add_history_item, read_history
 from language_menu import LanguageMenuButton
+from oxford_client import build_oxford_search_url
 from setup_wizard import ConnectionWorker, SetupWizard
 from settings_store import (
+    HISTORY_LINK_TARGET_NOTION,
+    HISTORY_LINK_TARGET_OXFORD,
     read_app_language,
+    read_history_link_target,
     read_notion_settings,
     save_app_language,
+    save_history_link_target,
     save_notion_settings,
 )
 from update_checker import UpdateInfo, check_for_update
@@ -268,6 +274,7 @@ class OxfordToNotionWindow(QMainWindow):
         self._settings_test_values: tuple[str, str] | None = None
         self.language = read_app_language() or detect_system_language()
         self.translator = Translator(self.language)
+        self.history_link_target = read_history_link_target()
 
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
@@ -472,6 +479,15 @@ class OxfordToNotionWindow(QMainWindow):
         self.database_entry.textChanged.connect(self.invalidate_settings_connection)
         layout.addWidget(self.database_entry)
 
+        layout.addSpacing(18)
+        self.history_target_label = QLabel()
+        layout.addWidget(self.history_target_label)
+        layout.addSpacing(6)
+        self.history_target_combo = QComboBox()
+        self.history_target_combo.addItem("", HISTORY_LINK_TARGET_NOTION)
+        self.history_target_combo.addItem("", HISTORY_LINK_TARGET_OXFORD)
+        layout.addWidget(self.history_target_combo)
+
         layout.addSpacing(12)
         self.wizard_button = QPushButton(objectName="secondary")
         self.wizard_button.clicked.connect(self.show_wizard_page)
@@ -524,6 +540,9 @@ class OxfordToNotionWindow(QMainWindow):
         self.token_label.setText(text("token_label"))
         self.show_token_checkbox.setText(text("show_token"))
         self.database_label.setText(text("database_label"))
+        self.history_target_label.setText(text("history_target_label"))
+        self.history_target_combo.setItemText(0, text("history_target_notion"))
+        self.history_target_combo.setItemText(1, text("history_target_oxford"))
         self.wizard_button.setText(text("open_wizard"))
         self.settings_back_button.setText(text("back"))
         self.settings_test_button.setText(text("test_connection"))
@@ -535,7 +554,9 @@ class OxfordToNotionWindow(QMainWindow):
                 text("update_available", version=self.update_info.version)
             )
         for button in self.history_buttons:
-            button.setToolTip(text("open_history_item", word=button.property("word")))
+            button.setToolTip(
+                text(self.history_tooltip_key(), word=button.property("word"))
+            )
         tooltip = text("language_tooltip")
         self.language_button.set_language_state(self.language, tooltip)
         self.settings_language_button.set_language_state(self.language, tooltip)
@@ -562,6 +583,8 @@ class OxfordToNotionWindow(QMainWindow):
         stored = read_notion_settings()
         self.token_entry.setText(stored.notion_token)
         self.database_entry.setText(stored.notion_database_value)
+        target_index = self.history_target_combo.findData(self.history_link_target)
+        self.history_target_combo.setCurrentIndex(max(0, target_index))
         self.settings_status.clear()
         self._settings_status_key = None
         self._settings_error_source = None
@@ -570,6 +593,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.settings_test_button.setText(self.translator.text("test_connection"))
         self.stack.setCurrentWidget(self.settings_page)
         self.token_entry.setFocus()
+        self.schedule_content_fit()
 
     @Slot()
     def show_wizard_page(self) -> None:
@@ -660,6 +684,16 @@ class OxfordToNotionWindow(QMainWindow):
         if self.current_page_url:
             QDesktopServices.openUrl(QUrl(self.current_page_url))
 
+    def history_url(self, item: ImportHistoryItem) -> str:
+        if self.history_link_target == HISTORY_LINK_TARGET_OXFORD:
+            return build_oxford_search_url(item.word)
+        return item.page_url
+
+    def history_tooltip_key(self) -> str:
+        if self.history_link_target == HISTORY_LINK_TARGET_OXFORD:
+            return "open_history_item_oxford"
+        return "open_history_item_notion"
+
     def refresh_history(self, items: list[ImportHistoryItem] | None = None) -> None:
         for button in self.history_buttons:
             self.history_grid.removeWidget(button)
@@ -671,10 +705,11 @@ class OxfordToNotionWindow(QMainWindow):
             button = QPushButton(f"{item.word} ↗", objectName="historyItem")
             button.setProperty("word", item.word)
             button.setToolTip(
-                self.translator.text("open_history_item", word=item.word)
+                self.translator.text(self.history_tooltip_key(), word=item.word)
             )
+            target_url = self.history_url(item)
             button.clicked.connect(
-                lambda _checked=False, url=item.page_url: self.open_external_url(url)
+                lambda _checked=False, url=target_url: self.open_external_url(url)
             )
             self.history_grid.addWidget(button, index // 3, index % 3)
             self.history_buttons.append(button)
@@ -782,8 +817,10 @@ class OxfordToNotionWindow(QMainWindow):
 
     @Slot()
     def save_settings(self) -> None:
+        selected_target = self.history_target_combo.currentData()
         try:
             save_notion_settings(self.token_entry.text(), self.database_entry.text())
+            save_history_link_target(selected_target)
         except AppError as exc:
             self._settings_status_key = None
             self._settings_error_source = str(exc)
@@ -791,6 +828,8 @@ class OxfordToNotionWindow(QMainWindow):
             self.settings_status.setStyleSheet("color: #b91c1c;")
             return
 
+        self.history_link_target = selected_target
+        self.refresh_history()
         self.show_main_page()
         self.set_status_key("settings_saved", "#15803d", success=True)
 

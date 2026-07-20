@@ -13,7 +13,13 @@ from settings_store import StoredNotionSettings
 from update_checker import UpdateInfo
 
 
-def make_window(monkeypatch, *, history=None, history_adder=None):
+def make_window(
+    monkeypatch,
+    *,
+    history=None,
+    history_adder=None,
+    history_link_target="notion",
+):
     app = QApplication.instance() or QApplication([])
     monkeypatch.setattr(
         gui,
@@ -21,12 +27,15 @@ def make_window(monkeypatch, *, history=None, history_adder=None):
         lambda: StoredNotionSettings("token", "database"),
     )
     monkeypatch.setattr(gui, "read_app_language", lambda: "zh-CN")
+    monkeypatch.setattr(gui, "read_history_link_target", lambda: history_link_target)
+    saved_targets = []
+    monkeypatch.setattr(gui, "save_history_link_target", saved_targets.append)
     window = OxfordToNotionWindow(
         history_reader=lambda: list(history or []),
         history_adder=history_adder or (lambda _word, _url: list(history or [])),
         start_update_check=False,
     )
-    return app, window
+    return app, window, saved_targets
 
 
 def item(word, url=None):
@@ -38,7 +47,7 @@ def item(word, url=None):
 
 
 def test_empty_history_and_no_update_are_hidden(monkeypatch):
-    _app, window = make_window(monkeypatch)
+    _app, window, _saved = make_window(monkeypatch)
 
     assert window.history_section.isHidden()
     assert window.update_banner.isHidden()
@@ -48,7 +57,7 @@ def test_empty_history_and_no_update_are_hidden(monkeypatch):
 
 def test_history_buttons_show_five_items_and_open_notion(monkeypatch):
     history = [item(word) for word in ["wonderful", "brutality", "refusal", "one", "two"]]
-    _app, window = make_window(monkeypatch, history=history)
+    _app, window, _saved = make_window(monkeypatch, history=history)
     opened = []
     monkeypatch.setattr(gui.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
 
@@ -68,7 +77,7 @@ def test_history_buttons_show_five_items_and_open_notion(monkeypatch):
 
 def test_second_history_row_has_bottom_clearance_at_minimum_window_size(monkeypatch):
     history = [item(word) for word in ["fraternize", "banana", "add", "apple"]]
-    app, window = make_window(monkeypatch, history=history)
+    app, window, _saved = make_window(monkeypatch, history=history)
 
     window.resize(window.minimumSize())
     window.show()
@@ -91,7 +100,7 @@ def test_success_controls_fit_without_resizing_or_clipping_history(monkeypatch):
         item(word)
         for word in ["predispose", "assassinate", "propagandist", "fraternize", "banana"]
     ]
-    app, window = make_window(
+    app, window, _saved = make_window(
         monkeypatch,
         history=history,
         history_adder=lambda _word, _url: history,
@@ -124,7 +133,11 @@ def test_successful_import_persists_and_refreshes_history(monkeypatch):
         current[:] = [item(word, url)]
         return list(current)
 
-    _app, window = make_window(monkeypatch, history=current, history_adder=add)
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history=current,
+        history_adder=add,
+    )
     window.history_reader = lambda: list(current)
 
     window.finish_success(
@@ -137,7 +150,7 @@ def test_successful_import_persists_and_refreshes_history(monkeypatch):
 
 
 def test_new_update_banner_is_clickable_and_retranslates(monkeypatch):
-    _app, window = make_window(monkeypatch)
+    _app, window, _saved = make_window(monkeypatch)
     opened = []
     monkeypatch.setattr(gui.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
     info = UpdateInfo(
@@ -161,10 +174,74 @@ def test_new_update_banner_is_clickable_and_retranslates(monkeypatch):
 
 
 def test_showing_no_update_hides_existing_banner(monkeypatch):
-    _app, window = make_window(monkeypatch)
+    _app, window, _saved = make_window(monkeypatch)
     window.show_update(UpdateInfo("1.5.0", "https://github.com/example/release"))
 
     window.show_update(None)
 
     assert window.update_banner.isHidden()
+    window.close()
+
+
+def test_history_buttons_open_oxford_for_existing_items(monkeypatch):
+    history = [item("mother's")]
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history=history,
+        history_link_target="oxford",
+    )
+    opened = []
+    monkeypatch.setattr(
+        gui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+
+    window.history_buttons[0].click()
+
+    assert opened == [
+        "https://www.oxfordlearnersdictionaries.com/search/english/direct/?q=mother%27s"
+    ]
+    window.close()
+
+
+def test_saving_oxford_target_refreshes_all_history_buttons(monkeypatch):
+    history = [item("brutality")]
+    _app, window, saved = make_window(monkeypatch, history=history)
+    opened = []
+    monkeypatch.setattr(
+        gui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+    window.show_settings_page()
+    oxford_index = window.history_target_combo.findData("oxford")
+    window.history_target_combo.setCurrentIndex(oxford_index)
+
+    window.save_settings()
+    window.history_buttons[0].click()
+
+    assert saved == ["oxford"]
+    assert opened == [
+        "https://www.oxfordlearnersdictionaries.com/search/english/direct/?q=brutality"
+    ]
+    window.close()
+
+
+def test_success_button_still_opens_notion_when_history_target_is_oxford(monkeypatch):
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history_link_target="oxford",
+    )
+    opened = []
+    monkeypatch.setattr(
+        gui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+    window.finish_success(ImportResult("emit", "https://www.notion.so/emit"))
+
+    window.open_button.click()
+
+    assert opened == ["https://www.notion.so/emit"]
     window.close()
