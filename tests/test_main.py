@@ -21,7 +21,10 @@ class FakeNotion:
 
 
 def test_run_reports_success(capsys):
-    entry = SimpleNamespace(word="brutality")
+    entry = SimpleNamespace(
+        word="brutality",
+        source_url="https://www.oxfordlearnersdictionaries.com/definition/english/brutality",
+    )
 
     code = main.run(["brutality"], oxford=FakeOxford(entry), notion=FakeNotion())
 

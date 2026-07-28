@@ -13,6 +13,7 @@ from oxford_client import OxfordClient, normalize_word
 class ImportResult:
     word: str
     page_url: str
+    oxford_url: str
 
 
 def build_dependencies() -> tuple[OxfordClient, NotionWriter]:
@@ -37,4 +38,8 @@ def import_word(
     normalized_word = normalize_word(word)
     entry = oxford.lookup(normalized_word)
     page_url = notion.upsert(entry)
-    return ImportResult(word=entry.word, page_url=page_url)
+    return ImportResult(
+        word=entry.word,
+        page_url=page_url,
+        oxford_url=entry.source_url,
+    )

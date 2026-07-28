@@ -256,7 +256,7 @@ class OxfordToNotionWindow(QMainWindow):
         *,
         import_func: Callable[[str], ImportResult] = import_word,
         history_reader: Callable[[], list[ImportHistoryItem]] = read_history,
-        history_adder: Callable[[str, str], list[ImportHistoryItem]] = add_history_item,
+        history_adder: Callable[[str, str, str], list[ImportHistoryItem]] = add_history_item,
         update_func: Callable[[], UpdateInfo | None] = check_for_update,
         start_update_check: bool = True,
     ) -> None:
@@ -640,7 +640,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.set_status_key("import_success", "#15803d", success=True, word=result.word)
         self.open_spacing.show()
         self.open_button.show()
-        items = self.history_adder(result.word, result.page_url)
+        items = self.history_adder(result.word, result.page_url, result.oxford_url)
         self.refresh_history(items)
         self.word_entry.clear()
         self.word_entry.setFocus()
@@ -688,7 +688,7 @@ class OxfordToNotionWindow(QMainWindow):
 
     def history_url(self, item: ImportHistoryItem) -> str:
         if self.history_link_target == HISTORY_LINK_TARGET_OXFORD:
-            return build_oxford_search_url(item.word)
+            return item.oxford_url or build_oxford_search_url(item.word)
         return item.page_url
 
     def history_tooltip_key(self) -> str:

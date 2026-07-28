@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## v1.4.7 — 2026-07-28
+
+### 简体中文
+
+- 新导入的历史记录会保存 Oxford 实际解析到的最终词条地址。
+- 点击“最近导入”并选择 Oxford 时，会直接打开最终词条页面，减少搜索跳转造成的临时错误。
+- `emitted` 等词形变化会打开 Oxford 返回的实际原型词条，例如 `emit`。
+- 旧历史记录保持兼容：没有最终地址时仍使用原来的 Oxford 搜索方式。
+
+### English
+
+- Newly imported history items now save Oxford's resolved entry URL.
+- Recent imports set to Oxford open the final entry directly, avoiding the extra search redirect that can fail temporarily.
+- Inflected forms such as `emitted` open the canonical entry returned by Oxford, such as `emit`.
+- Existing history remains compatible and falls back to Oxford search when no resolved URL is available.
+
 ## v1.4.6 — 2026-07-21
 
 ### 简体中文

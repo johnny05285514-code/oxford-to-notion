@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -33,17 +34,18 @@ def make_window(
     monkeypatch.setattr(gui, "save_history_link_target", saved_targets.append)
     window = OxfordToNotionWindow(
         history_reader=lambda: list(history or []),
-        history_adder=history_adder or (lambda _word, _url: list(history or [])),
+        history_adder=history_adder or (lambda *_args: list(history or [])),
         start_update_check=False,
     )
     return app, window, saved_targets
 
 
-def item(word, url=None):
+def item(word, url=None, oxford_url=None):
     return ImportHistoryItem(
         word,
         url or f"https://www.notion.so/{word}",
         datetime(2026, 7, 12, tzinfo=timezone.utc).isoformat(),
+        oxford_url,
     )
 
 
@@ -104,14 +106,20 @@ def test_success_controls_fit_without_resizing_or_clipping_history(monkeypatch):
     app, window, _saved = make_window(
         monkeypatch,
         history=history,
-        history_adder=lambda _word, _url: history,
+        history_adder=lambda *_args: history,
     )
     window.resize(window.minimumSize())
     window.show()
     app.processEvents()
     initial_height = window.height()
 
-    window.finish_success(ImportResult("predispose", "https://www.notion.so/predispose"))
+    window.finish_success(
+        ImportResult(
+            "predispose",
+            "https://www.notion.so/predispose",
+            "https://www.oxfordlearnersdictionaries.com/definition/english/predispose",
+        )
+    )
     app.processEvents()
 
     last_button = window.history_buttons[-1]
@@ -130,8 +138,8 @@ def test_success_controls_fit_without_resizing_or_clipping_history(monkeypatch):
 def test_successful_import_persists_and_refreshes_history(monkeypatch):
     current = []
 
-    def add(word, url):
-        current[:] = [item(word, url)]
+    def add(word, url, oxford_url):
+        current[:] = [item(word, url, oxford_url)]
         return list(current)
 
     _app, window, _saved = make_window(
@@ -142,7 +150,11 @@ def test_successful_import_persists_and_refreshes_history(monkeypatch):
     window.history_reader = lambda: list(current)
 
     window.finish_success(
-        ImportResult("brutality", "https://www.notion.so/brutality")
+        ImportResult(
+            "brutality",
+            "https://www.notion.so/brutality",
+            "https://www.oxfordlearnersdictionaries.com/definition/english/brutality",
+        )
     )
 
     assert not window.history_section.isHidden()
@@ -206,6 +218,62 @@ def test_history_buttons_open_oxford_for_existing_items(monkeypatch):
     window.close()
 
 
+def test_history_button_opens_saved_oxford_source_url_without_search_redirect(
+    monkeypatch,
+):
+    oxford_url = (
+        "https://www.oxfordlearnersdictionaries.com/"
+        "definition/english/emit?q=emitted"
+    )
+    history = [
+        SimpleNamespace(
+            word="emit",
+            page_url="https://www.notion.so/emit",
+            imported_at=datetime(2026, 7, 12, tzinfo=timezone.utc).isoformat(),
+            oxford_url=oxford_url,
+        )
+    ]
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history=history,
+        history_link_target="oxford",
+    )
+    opened = []
+    monkeypatch.setattr(
+        gui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+
+    window.history_buttons[0].click()
+
+    assert opened == [oxford_url]
+    window.close()
+
+
+def test_successful_import_passes_oxford_source_url_to_history(monkeypatch):
+    added = []
+
+    def add(*values):
+        added.append(values)
+        return []
+
+    _app, window, _saved = make_window(monkeypatch, history_adder=add)
+    result = SimpleNamespace(
+        word="emit",
+        page_url="https://www.notion.so/emit",
+        oxford_url=(
+            "https://www.oxfordlearnersdictionaries.com/"
+            "definition/english/emit?q=emitted"
+        ),
+    )
+
+    window.finish_success(result)
+
+    assert added == [(result.word, result.page_url, result.oxford_url)]
+    window.close()
+
+
 def test_saving_oxford_target_refreshes_all_history_buttons(monkeypatch):
     history = [item("brutality")]
     _app, window, saved = make_window(monkeypatch, history=history)
@@ -240,7 +308,13 @@ def test_success_button_still_opens_notion_when_history_target_is_oxford(monkeyp
         "openUrl",
         lambda url: opened.append(url.toString()),
     )
-    window.finish_success(ImportResult("emit", "https://www.notion.so/emit"))
+    window.finish_success(
+        ImportResult(
+            "emit",
+            "https://www.notion.so/emit",
+            "https://www.oxfordlearnersdictionaries.com/definition/english/emit?q=emitted",
+        )
+    )
 
     window.open_button.click()
 
@@ -262,14 +336,20 @@ def test_english_success_history_and_footer_do_not_overlap(monkeypatch):
     app, window, _saved = make_window(
         monkeypatch,
         history=history,
-        history_adder=lambda _word, _url: history,
+        history_adder=lambda *_args: history,
     )
     window.set_language("en")
     window.resize(window.minimumSize())
     window.show()
     app.processEvents()
 
-    window.finish_success(ImportResult("predispose", "https://www.notion.so/predispose"))
+    window.finish_success(
+        ImportResult(
+            "predispose",
+            "https://www.notion.so/predispose",
+            "https://www.oxfordlearnersdictionaries.com/definition/english/predispose",
+        )
+    )
     app.processEvents()
 
     rendered_text_width = window.status_label.fontMetrics().horizontalAdvance(

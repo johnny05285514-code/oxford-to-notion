@@ -44,6 +44,33 @@ def test_history_ignores_invalid_records_and_unsafe_urls(tmp_path):
     assert [item.word for item in items] == ["valid"]
 
 
+def test_history_reads_saved_oxford_source_url(tmp_path):
+    path = tmp_path / "history.json"
+    oxford_url = (
+        "https://www.oxfordlearnersdictionaries.com/"
+        "definition/english/emit?q=emitted"
+    )
+    path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "word": "emit",
+                        "page_url": "https://www.notion.so/emit",
+                        "oxford_url": oxford_url,
+                        "imported_at": "2026-07-12T01:02:03+00:00",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    item = read_history(path)[0]
+
+    assert getattr(item, "oxford_url", None) == oxford_url
+
+
 def test_add_history_moves_duplicate_to_front_and_limits_to_five(tmp_path):
     path = tmp_path / "history.json"
     for index in range(6):

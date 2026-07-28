@@ -25,19 +25,30 @@ class FakeNotion:
 
 
 def test_import_word_normalizes_and_returns_result():
-    entry = SimpleNamespace(word="brutality")
+    entry = SimpleNamespace(
+        word="brutality",
+        source_url=(
+            "https://www.oxfordlearnersdictionaries.com/"
+            "definition/english/brutality?q=brutality"
+        ),
+    )
     oxford = FakeOxford(entry)
     notion = FakeNotion()
 
     result = import_word("  Brutality  ", oxford=oxford, notion=notion)
 
-    assert result == ImportResult(word="brutality", page_url="https://notion.test/page")
+    assert result.word == "brutality"
+    assert result.page_url == "https://notion.test/page"
+    assert getattr(result, "oxford_url", None) == entry.source_url
     assert oxford.received_word == "brutality"
     assert notion.received_entry is entry
 
 
 def test_import_word_builds_dependencies_when_not_injected():
-    entry = SimpleNamespace(word="brutality")
+    entry = SimpleNamespace(
+        word="brutality",
+        source_url="https://www.oxfordlearnersdictionaries.com/definition/english/brutality",
+    )
     oxford = FakeOxford(entry)
     notion = FakeNotion()
     calls = []

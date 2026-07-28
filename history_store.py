@@ -16,6 +16,7 @@ class ImportHistoryItem:
     word: str
     page_url: str
     imported_at: str
+    oxford_url: str | None = None
 
 
 def _safe_web_url(value: object) -> str | None:
@@ -32,6 +33,7 @@ def _parse_item(value: object) -> ImportHistoryItem | None:
         return None
     word = value.get("word")
     page_url = _safe_web_url(value.get("page_url"))
+    oxford_url = _safe_web_url(value.get("oxford_url"))
     imported_at = value.get("imported_at")
     if not isinstance(word, str) or not word.strip() or not page_url:
         return None
@@ -41,7 +43,7 @@ def _parse_item(value: object) -> ImportHistoryItem | None:
         datetime.fromisoformat(imported_at)
     except ValueError:
         return None
-    return ImportHistoryItem(word.strip().lower(), page_url, imported_at)
+    return ImportHistoryItem(word.strip().lower(), page_url, imported_at, oxford_url)
 
 
 def read_history(path: Path | None = None) -> list[ImportHistoryItem]:
@@ -61,6 +63,7 @@ def read_history(path: Path | None = None) -> list[ImportHistoryItem]:
 def add_history_item(
     word: str,
     page_url: str,
+    oxford_url: str | None = None,
     *,
     path: Path | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -68,13 +71,19 @@ def add_history_item(
     target = path or default_history_path()
     normalized_word = word.strip().lower()
     safe_url = _safe_web_url(page_url)
+    safe_oxford_url = _safe_web_url(oxford_url)
     if not normalized_word or not safe_url:
         return read_history(target)
 
     timestamp = now()
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
-    newest = ImportHistoryItem(normalized_word, safe_url, timestamp.isoformat())
+    newest = ImportHistoryItem(
+        normalized_word,
+        safe_url,
+        timestamp.isoformat(),
+        safe_oxford_url,
+    )
     existing = [item for item in read_history(target) if item.word != normalized_word]
     items = [newest, *existing][:MAX_HISTORY_ITEMS]
 
