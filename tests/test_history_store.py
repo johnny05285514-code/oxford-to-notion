@@ -71,9 +71,9 @@ def test_history_reads_saved_oxford_source_url(tmp_path):
     assert getattr(item, "oxford_url", None) == oxford_url
 
 
-def test_add_history_moves_duplicate_to_front_and_limits_to_five(tmp_path):
+def test_add_history_moves_duplicate_to_front_and_limits_to_one_hundred(tmp_path):
     path = tmp_path / "history.json"
-    for index in range(6):
+    for index in range(101):
         add_history_item(
             f"word{index}",
             f"https://www.notion.so/word{index}",
@@ -88,7 +88,10 @@ def test_add_history_moves_duplicate_to_front_and_limits_to_five(tmp_path):
         now=lambda: NOW,
     )
 
-    assert [item.word for item in items] == ["word3", "word5", "word4", "word2", "word1"]
+    assert len(items) == 100
+    assert items[0].word == "word3"
+    assert "word100" in {item.word for item in items}
+    assert "word0" not in {item.word for item in items}
     assert items[0].page_url.endswith("word3-new")
     assert items[0].imported_at == "2026-07-12T01:02:03+00:00"
 

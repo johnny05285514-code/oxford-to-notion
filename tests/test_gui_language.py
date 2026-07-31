@@ -38,7 +38,9 @@ def test_saved_language_is_used_and_menu_is_extensible(monkeypatch):
     assert [action.isCheckable() for action in window.language_menu.actions()] == [True, True]
     assert [action.isChecked() for action in window.language_menu.actions()] == [False, True]
     assert window.language_button.width() == 46
-    assert window.language_button.width() * 2 == window.settings_button.width()
+    assert window.settings_button is window.nav_settings_button
+    assert window.nav_import_button.text() == "Import"
+    assert window.nav_recent_button.text() == "Recent"
 
     window.close()
 

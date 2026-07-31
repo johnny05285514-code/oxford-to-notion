@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## v1.5.0 — 2026-07-31
+
+### 简体中文
+
+- 全新侧边栏布局：导入、最近导入和设置页面更清晰，点击左上角的应用名称可随时回到导入页。
+- 导入页保留最近 5 个单词；“最近导入”页最多保存并滚动查看 100 个本机历史记录。
+- 设置页重新分组，Notion 连接、使用偏好和帮助更容易找到。
+
+### English
+
+- New sidebar layout with clear Import, Recent, and Settings pages; click the app name to return to Import from anywhere.
+- The Import page keeps five recent words, while the Recent page stores and scrolls through up to 100 local history items.
+- Settings are now grouped into Notion connection, preferences, and help.
+
 ## v1.4.8 — 2026-07-31
 
 ### 简体中文

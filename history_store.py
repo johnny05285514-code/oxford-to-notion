@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from app_paths import history_path as default_history_path
 
 
-MAX_HISTORY_ITEMS = 5
+MAX_HISTORY_ITEMS = 100
 
 
 @dataclass(frozen=True, slots=True)

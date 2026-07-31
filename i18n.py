@@ -18,6 +18,17 @@ SUPPORTED_LANGUAGE_CODES = frozenset(language.code for language in SUPPORTED_LAN
 
 
 ENGLISH_MESSAGES = {
+    "nav_import": "Import",
+    "nav_recent": "Recent",
+    "page_import": "Import a word",
+    "import_heading": "Build your vocabulary, one word at a time.",
+    "recent_subtitle": "Your 100 most recently imported words are kept on this device.",
+    "recent_empty": "No imported words yet.",
+    "connection_heading": "Notion connection",
+    "preferences_heading": "Preferences",
+    "help_heading": "Help",
+    "performance_note": "Show Oxford and Notion timing after each successful import.",
+    "cancel": "Cancel",
     "history_target_label": "Open recent imports in",
     "history_target_notion": "Notion",
     "history_target_oxford": "Oxford Learner's Dictionaries",
@@ -101,6 +112,17 @@ ENGLISH_MESSAGES = {
 }
 
 CHINESE_MESSAGES = {
+    "nav_import": "导入",
+    "nav_recent": "最近导入",
+    "page_import": "导入单词",
+    "import_heading": "一次一个单词，建立你的词汇库。",
+    "recent_subtitle": "此设备会保留最近导入的 100 个单词。",
+    "recent_empty": "还没有导入过单词。",
+    "connection_heading": "Notion 连接",
+    "preferences_heading": "使用偏好",
+    "help_heading": "帮助",
+    "performance_note": "每次成功导入后显示 Oxford 和 Notion 的耗时。",
+    "cancel": "取消",
     "history_target_label": "最近导入打开方式",
     "history_target_notion": "Notion",
     "history_target_oxford": "Oxford Learner's Dictionaries",

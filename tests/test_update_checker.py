@@ -37,10 +37,10 @@ class FakeSession:
         return self.response
 
 
-def release(version="v1.5.0", **overrides):
+def release(version="v1.5.1", **overrides):
     payload = {
         "tag_name": version,
-        "html_url": "https://github.com/johnny/repo/releases/tag/v1.5.0",
+        "html_url": "https://github.com/johnny/repo/releases/tag/v1.5.1",
         "draft": False,
         "prerelease": False,
     }
@@ -49,7 +49,7 @@ def release(version="v1.5.0", **overrides):
 
 
 def test_version_parser_accepts_v_prefix_and_rejects_invalid_values():
-    assert CURRENT_VERSION == "1.4.8"
+    assert CURRENT_VERSION == "1.5.0"
     assert parse_version("v1.4.2") == (1, 4, 2)
     assert parse_version("1.5") == (1, 5, 0)
     assert parse_version("latest") is None
@@ -62,12 +62,12 @@ def test_newer_stable_release_returns_update_and_writes_cache(tmp_path):
 
     result = check_for_update(session=session, state_path=path, now=lambda: NOW)
 
-    assert result == UpdateInfo("1.5.0", release()["html_url"])
+    assert result == UpdateInfo("1.5.1", release()["html_url"])
     assert session.calls[0][1]["timeout"] <= 10
     assert "Oxford-to-Notion" in session.calls[0][1]["headers"]["User-Agent"]
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["checked_at"] == NOW.isoformat()
-    assert payload["update"]["version"] == "1.5.0"
+    assert payload["update"]["version"] == "1.5.1"
 
 
 def test_fresh_cache_is_reused_without_network(tmp_path):
@@ -77,8 +77,8 @@ def test_fresh_cache_is_reused_without_network(tmp_path):
             {
                 "checked_at": (NOW - timedelta(hours=2)).isoformat(),
                 "update": {
-                    "version": "1.5.0",
-                    "release_url": "https://github.com/johnny/repo/releases/tag/v1.5.0",
+                    "version": "1.5.1",
+                    "release_url": "https://github.com/johnny/repo/releases/tag/v1.5.1",
                 },
             }
         ),
@@ -89,7 +89,7 @@ def test_fresh_cache_is_reused_without_network(tmp_path):
     result = check_for_update(session=session, state_path=path, now=lambda: NOW)
 
     assert result == UpdateInfo(
-        "1.5.0", "https://github.com/johnny/repo/releases/tag/v1.5.0"
+        "1.5.1", "https://github.com/johnny/repo/releases/tag/v1.5.1"
     )
     assert session.calls == []
 

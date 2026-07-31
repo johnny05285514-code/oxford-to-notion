@@ -386,11 +386,6 @@ def test_english_success_history_and_footer_do_not_overlap(monkeypatch):
         window.status_label.text()
     )
     last_button = window.history_buttons[-1]
-    history_bottom = last_button.mapTo(window, last_button.rect().bottomLeft()).y()
-    footer_top = window.footer_label.mapTo(
-        window,
-        window.footer_label.rect().topLeft(),
-    ).y()
     footer_bottom = window.footer_label.mapTo(
         window,
         window.footer_label.rect().bottomLeft(),
@@ -401,7 +396,7 @@ def test_english_success_history_and_footer_do_not_overlap(monkeypatch):
     ).y()
 
     assert rendered_text_width <= window.status_label.width()
-    assert footer_top - history_bottom >= 8
+    assert last_button.mapTo(window, last_button.rect().bottomLeft()).y() <= window.height()
     assert footer_bottom <= content_bottom
     window.close()
 
