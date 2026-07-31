@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -90,3 +91,14 @@ def test_settings_does_not_show_success_for_credentials_edited_during_test(monke
     assert pool.worker is not None
     window.close()
     assert app is not None
+
+
+def test_update_worker_ignores_a_signal_deleted_during_app_close():
+    class DeletedSignal:
+        def emit(self, _result):
+            raise RuntimeError("Signal source has been deleted")
+
+    worker = gui.UpdateWorker(lambda: None)
+    worker.signals = SimpleNamespace(completed=DeletedSignal())
+
+    worker.run()

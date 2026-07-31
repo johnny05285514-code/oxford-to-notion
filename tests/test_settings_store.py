@@ -7,8 +7,10 @@ from exceptions import ConfigurationError
 from settings_store import (
     HISTORY_LINK_TARGET_NOTION,
     HISTORY_LINK_TARGET_OXFORD,
+    read_performance_diagnostics,
     read_history_link_target,
     read_notion_settings,
+    save_performance_diagnostics,
     save_history_link_target,
     save_notion_settings,
 )
@@ -81,3 +83,14 @@ def test_invalid_saved_history_link_target_falls_back_to_notion(tmp_path: Path):
 def test_rejects_invalid_history_link_target(tmp_path: Path):
     with pytest.raises(ConfigurationError, match="Unsupported history link target"):
         save_history_link_target("unknown", env_path=tmp_path / ".env")
+
+
+def test_performance_diagnostics_defaults_off_and_round_trips(tmp_path: Path):
+    path = tmp_path / ".env"
+    path.write_text("NOTION_TOKEN=secret-value\n", encoding="utf-8")
+
+    assert read_performance_diagnostics(env_path=path) is False
+    save_performance_diagnostics(True, env_path=path)
+
+    assert read_performance_diagnostics(env_path=path) is True
+    assert dotenv_values(path)["NOTION_TOKEN"] == "secret-value"

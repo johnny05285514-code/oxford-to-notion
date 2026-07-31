@@ -1,5 +1,7 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
+from time import perf_counter
 from typing import Any
 
 import httpx
@@ -23,6 +25,12 @@ REQUIRED_SCHEMA = {
     "Source URL": "url",
     "Added Date": "date",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class NotionTiming:
+    check_seconds: float
+    write_seconds: float
 
 
 def rich_text(text: str) -> list[dict[str, Any]]:
@@ -94,10 +102,13 @@ class NotionWriter:
         client: Any,
         database_id: str,
         today: Callable[[], date] = date.today,
+        clock: Callable[[], float] = perf_counter,
     ) -> None:
         self.client = client
         self.database_id = database_id
         self.today = today
+        self.clock = clock
+        self.last_timing: NotionTiming | None = None
 
     def validate_connection(self) -> str:
         """Validate database access and schema without writing any data."""
@@ -106,41 +117,60 @@ class NotionWriter:
         return data_source_id
 
     def upsert(self, entry: WordEntry) -> str:
+        self.last_timing = None
+        started_at = self.clock()
         try:
             data_source_id, schema = self._resolve_data_source()
             self._validate_schema(schema)
+            self.clock()
             existing = self.client.data_sources.query(
                 data_source_id=data_source_id,
                 filter={"property": "Word", "rich_text": {"equals": entry.word}},
                 page_size=1,
             ).get("results", [])
+            checked_at = self.clock()
             blocks = build_blocks(entry)
             if existing:
                 page = existing[0]
                 old_managed_ids = self._managed_child_ids(page["id"])
                 new_managed_id = self._append_managed_container(page["id"], blocks)
-                updated = self.client.pages.update(
-                    page_id=page["id"],
-                    properties=build_properties(entry),
-                )
+                try:
+                    updated = self.client.pages.update(
+                        page_id=page["id"],
+                        properties=build_properties(entry),
+                    )
+                except Exception:
+                    try:
+                        self.client.blocks.delete(block_id=new_managed_id)
+                    except Exception:
+                        pass
+                    raise
                 for block_id in old_managed_ids:
                     if block_id != new_managed_id:
                         self.client.blocks.delete(block_id=block_id)
-                return updated.get("url") or page.get("url") or page["id"]
+                page_url = updated.get("url") or page.get("url") or page["id"]
 
-            page = self.client.pages.create(
-                parent={"type": "data_source_id", "data_source_id": data_source_id},
-                properties=build_properties(entry, self.today()),
-            )
-            try:
-                self._append_managed_container(page["id"], blocks)
-            except Exception:
+            else:
+                page = self.client.pages.create(
+                    parent={"type": "data_source_id", "data_source_id": data_source_id},
+                    properties=build_properties(entry, self.today()),
+                )
                 try:
-                    self.client.pages.update(page_id=page["id"], archived=True)
+                    self._append_managed_container(page["id"], blocks)
                 except Exception:
-                    pass
-                raise
-            return page.get("url") or page["id"]
+                    try:
+                        self.client.pages.update(page_id=page["id"], archived=True)
+                    except Exception:
+                        pass
+                    raise
+                page_url = page.get("url") or page["id"]
+
+            finished_at = self.clock()
+            self.last_timing = NotionTiming(
+                check_seconds=checked_at - started_at,
+                write_seconds=finished_at - checked_at,
+            )
+            return page_url
         except NotionSchemaError:
             raise
         except (

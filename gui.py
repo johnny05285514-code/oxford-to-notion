@@ -45,9 +45,11 @@ from settings_store import (
     read_app_language,
     read_history_link_target,
     read_notion_settings,
+    read_performance_diagnostics,
     save_app_language,
     save_history_link_target,
     save_notion_settings,
+    save_performance_diagnostics,
 )
 from update_checker import UpdateInfo, check_for_update
 
@@ -247,7 +249,11 @@ class UpdateWorker(QRunnable):
             result = self.update_func()
         except Exception:
             result = None
-        self.signals.completed.emit(result)
+        try:
+            self.signals.completed.emit(result)
+        except RuntimeError:
+            # The application can close while the optional update request is running.
+            pass
 
 
 class OxfordToNotionWindow(QMainWindow):
@@ -275,6 +281,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.language = read_app_language() or detect_system_language()
         self.translator = Translator(self.language)
         self.history_link_target = read_history_link_target()
+        self.performance_diagnostics_enabled = read_performance_diagnostics()
 
         self.setWindowTitle("Oxford to Notion")
         self.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
@@ -490,6 +497,10 @@ class OxfordToNotionWindow(QMainWindow):
         layout.addWidget(self.history_target_combo)
 
         layout.addSpacing(12)
+        self.performance_diagnostics_checkbox = QCheckBox()
+        layout.addWidget(self.performance_diagnostics_checkbox)
+
+        layout.addSpacing(12)
         self.wizard_button = QPushButton(objectName="secondary")
         self.wizard_button.clicked.connect(self.show_wizard_page)
         layout.addWidget(self.wizard_button)
@@ -545,6 +556,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_target_label.setText(text("history_target_label"))
         self.history_target_combo.setItemText(0, text("history_target_notion"))
         self.history_target_combo.setItemText(1, text("history_target_oxford"))
+        self.performance_diagnostics_checkbox.setText(text("performance_diagnostics"))
         self.wizard_button.setText(text("open_wizard"))
         self.settings_back_button.setText(text("back"))
         self.settings_test_button.setText(text("test_connection"))
@@ -587,6 +599,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.database_entry.setText(stored.notion_database_value)
         target_index = self.history_target_combo.findData(self.history_link_target)
         self.history_target_combo.setCurrentIndex(max(0, target_index))
+        self.performance_diagnostics_checkbox.setChecked(self.performance_diagnostics_enabled)
         self.settings_status.clear()
         self._settings_status_key = None
         self._settings_error_source = None
@@ -637,7 +650,19 @@ class OxfordToNotionWindow(QMainWindow):
     def finish_success(self, result: ImportResult) -> None:
         self.set_ready()
         self.current_page_url = result.page_url
-        self.set_status_key("import_success", "#15803d", success=True, word=result.word)
+        if self.performance_diagnostics_enabled and result.timing is not None:
+            self.set_status_key(
+                "import_success_with_timing",
+                "#15803d",
+                success=True,
+                word=result.word,
+                oxford=result.timing.oxford_seconds,
+                check=result.timing.notion_check_seconds,
+                save=result.timing.notion_write_seconds,
+                total=result.timing.total_seconds,
+            )
+        else:
+            self.set_status_key("import_success", "#15803d", success=True, word=result.word)
         self.open_spacing.show()
         self.open_button.show()
         items = self.history_adder(result.word, result.page_url, result.oxford_url)
@@ -821,9 +846,11 @@ class OxfordToNotionWindow(QMainWindow):
     @Slot()
     def save_settings(self) -> None:
         selected_target = self.history_target_combo.currentData()
+        diagnostics_enabled = self.performance_diagnostics_checkbox.isChecked()
         try:
             save_notion_settings(self.token_entry.text(), self.database_entry.text())
             save_history_link_target(selected_target)
+            save_performance_diagnostics(diagnostics_enabled)
         except AppError as exc:
             self._settings_status_key = None
             self._settings_error_source = str(exc)
@@ -832,6 +859,7 @@ class OxfordToNotionWindow(QMainWindow):
             return
 
         self.history_link_target = selected_target
+        self.performance_diagnostics_enabled = diagnostics_enabled
         self.refresh_history()
         self.show_main_page()
         self.set_status_key("settings_saved", "#15803d", success=True)

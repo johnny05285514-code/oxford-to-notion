@@ -15,6 +15,7 @@ HISTORY_LINK_TARGETS = {
     HISTORY_LINK_TARGET_NOTION,
     HISTORY_LINK_TARGET_OXFORD,
 }
+PERFORMANCE_DIAGNOSTICS_KEY = "PERFORMANCE_DIAGNOSTICS"
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,3 +104,22 @@ def save_history_link_target(
     if not path.exists():
         path.touch()
     set_key(str(path), "HISTORY_LINK_TARGET", normalized)
+
+
+def read_performance_diagnostics(*, env_path: Path | None = None) -> bool:
+    path = env_path or default_env_path()
+    values = dotenv_values(path) if path.exists() else {}
+    value = (values.get(PERFORMANCE_DIAGNOSTICS_KEY) or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def save_performance_diagnostics(
+    enabled: bool,
+    *,
+    env_path: Path | None = None,
+) -> None:
+    path = env_path or default_env_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.touch()
+    set_key(str(path), PERFORMANCE_DIAGNOSTICS_KEY, "1" if enabled else "0")

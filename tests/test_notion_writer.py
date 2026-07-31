@@ -228,6 +228,37 @@ def test_failed_replacement_keeps_old_managed_content():
     assert "old-managed" not in deleted_ids
 
 
+def test_failed_property_update_removes_new_managed_content():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children = Endpoint(
+        list={"results": [_managed_toggle("old-managed")], "has_more": False},
+        append={},
+    )
+    client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
+    client.pages = Endpoint(update=RequestTimeoutError())
+    _configure_managed_append(client)
+
+    with pytest.raises(NotionWriteError):
+        NotionWriter(client, "database-id").upsert(ENTRY)
+
+    deleted_ids = [
+        kwargs["block_id"] for name, kwargs in client.blocks.calls if name == "delete"
+    ]
+    assert deleted_ids == ["new-managed"]
+
+
+def test_upsert_records_notion_check_and_write_durations():
+    client = FakeClient([])
+    _configure_managed_append(client)
+    ticks = iter((0.0, 1.0, 3.5, 5.0))
+
+    writer = NotionWriter(client, "database-id", clock=lambda: next(ticks))
+    writer.upsert(ENTRY)
+
+    assert writer.last_timing.check_seconds == 3.5
+    assert writer.last_timing.write_seconds == 1.5
+
+
 def test_upsert_wraps_httpx_transport_errors():
     request = httpx.Request("GET", "https://api.notion.com/v1/databases/test")
     client = FakeClient([])

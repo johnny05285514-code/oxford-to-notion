@@ -68,3 +68,26 @@ def test_import_word_requires_dependencies_as_a_pair():
 
     with pytest.raises(ValueError, match="together"):
         import_word("brutality", oxford=FakeOxford(entry))
+
+
+def test_import_word_returns_timing_breakdown():
+    entry = SimpleNamespace(
+        word="brutality",
+        source_url="https://www.oxfordlearnersdictionaries.com/definition/english/brutality",
+    )
+    oxford = FakeOxford(entry)
+    notion = FakeNotion()
+    notion.last_timing = SimpleNamespace(check_seconds=0.3, write_seconds=0.7)
+    ticks = iter((0.0, 0.5, 1.5))
+
+    result = import_word(
+        "brutality",
+        oxford=oxford,
+        notion=notion,
+        clock=lambda: next(ticks),
+    )
+
+    assert result.timing.oxford_seconds == 0.5
+    assert result.timing.notion_check_seconds == 0.3
+    assert result.timing.notion_write_seconds == 0.7
+    assert result.timing.total_seconds == 1.5

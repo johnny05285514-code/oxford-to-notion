@@ -274,6 +274,36 @@ def test_successful_import_passes_oxford_source_url_to_history(monkeypatch):
     window.close()
 
 
+def test_enabled_performance_diagnostics_shows_import_timing(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(
+        gui,
+        "read_notion_settings",
+        lambda: StoredNotionSettings("token", "database"),
+    )
+    monkeypatch.setattr(gui, "read_app_language", lambda: "en")
+    monkeypatch.setattr(gui, "read_performance_diagnostics", lambda: True)
+    window = OxfordToNotionWindow(start_update_check=False)
+
+    result = ImportResult(
+        "brutality",
+        "https://www.notion.so/brutality",
+        "https://www.oxfordlearnersdictionaries.com/definition/english/brutality",
+        timing=SimpleNamespace(
+            oxford_seconds=0.4,
+            notion_check_seconds=0.2,
+            notion_write_seconds=0.6,
+            total_seconds=1.2,
+        ),
+    )
+    window.finish_success(result)
+
+    assert "Oxford 0.4s" in window.status_label.text()
+    assert "Total 1.2s" in window.status_label.text()
+    window.close()
+    assert app is not None
+
+
 def test_saving_oxford_target_refreshes_all_history_buttons(monkeypatch):
     history = [item("brutality")]
     _app, window, saved = make_window(monkeypatch, history=history)

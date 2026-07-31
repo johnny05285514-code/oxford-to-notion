@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## v1.4.8 — 2026-07-31
+
+### 简体中文
+
+- 修复重复导入已有单词时，Notion 后续字段更新失败可能留下新的重复 Oxford 内容的问题；个人笔记仍会保留。
+- 在“设置”中新增“显示导入性能详情”（默认关闭），可显示 Oxford 查询、Notion 检查、保存和总耗时。
+- 修复关闭软件时后台版本检查偶尔产生的线程提示。
+
+### English
+
+- Fixed a rare repeat-import failure path that could leave a duplicate new Oxford section when a later Notion property update failed; personal notes remain preserved.
+- Added an optional, off-by-default import performance display for Oxford lookup, Notion check, save, and total time.
+- Fixed an occasional background update-check signal warning during application shutdown.
+
 ## v1.4.7 — 2026-07-28
 
 ### 简体中文
