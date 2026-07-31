@@ -107,14 +107,20 @@ def test_performance_checkbox_uses_high_contrast_blue_checkmark(monkeypatch):
     app.processEvents()
 
     image = checkbox.grab().toImage()
-    colors = {
-        image.pixelColor(x, y).name()
+    pixels = {
+        (x, y): image.pixelColor(x, y).name()
         for x in range(min(24, image.width()))
         for y in range(image.height())
     }
+    colors = set(pixels.values())
+    blue_points = [point for point, color in pixels.items() if color == "#1769e8"]
+    white_points = [point for point, color in pixels.items() if color == "#ffffff"]
 
     assert "#1769e8" in colors
     assert "#ffffff" in colors
+    assert max(x for x, _y in blue_points) - min(x for x, _y in blue_points) + 1 <= 16
+    assert max(x for x, _y in white_points) - min(x for x, _y in white_points) + 1 <= 10
+    assert max(y for _x, y in white_points) - min(y for _x, y in white_points) + 1 <= 8
     window.close()
 
 

@@ -161,10 +161,10 @@ QFrame#settingsGroup, QFrame#updateBanner {
 }
 QCheckBox { color: #334155; spacing: 8px; }
 QCheckBox#modernCheck::indicator {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border: 1px solid #b8c4d4;
-    border-radius: 5px;
+    border-radius: 4px;
     background: #ffffff;
 }
 QCheckBox#modernCheck::indicator:hover { border-color: #7aaaf0; }
@@ -258,15 +258,13 @@ class ModernCheckBox(QCheckBox):
         )
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        pen = QPen(QColor("#ffffff"), 2.0)
+        pen = QPen(QColor("#ffffff"), 1.7)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
-        check = QPainterPath(
-            QPointF(indicator.left() + 4.2, indicator.center().y())
-        )
-        check.lineTo(QPointF(indicator.left() + 7.5, indicator.bottom() - 4.2))
-        check.lineTo(QPointF(indicator.right() - 3.5, indicator.top() + 4.7))
+        check = QPainterPath(QPointF(indicator.left() + 4.0, indicator.center().y()))
+        check.lineTo(QPointF(indicator.left() + 6.7, indicator.bottom() - 4.2))
+        check.lineTo(QPointF(indicator.right() - 3.0, indicator.top() + 5.0))
         painter.drawPath(check)
 
 
