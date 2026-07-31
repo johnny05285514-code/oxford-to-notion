@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QStyle,
+    QStyleOptionButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -158,13 +160,39 @@ QFrame#settingsGroup, QFrame#updateBanner {
     border-radius: 12px;
 }
 QCheckBox { color: #334155; spacing: 8px; }
-QComboBox {
+QCheckBox#modernCheck::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #b8c4d4;
+    border-radius: 5px;
+    background: #ffffff;
+}
+QCheckBox#modernCheck::indicator:hover { border-color: #7aaaf0; }
+QCheckBox#modernCheck::indicator:checked {
+    background: #1769e8;
+    border-color: #1769e8;
+}
+QComboBox#modernCombo {
     min-height: 40px;
-    padding: 0 12px;
+    padding: 0 44px 0 12px;
     border: 1px solid #d5dce6;
     border-radius: 9px;
     background: #ffffff;
 }
+QComboBox#modernCombo:hover { border-color: #b8c7da; }
+QComboBox#modernCombo:focus { border: 2px solid #1769e8; }
+QComboBox#modernCombo::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 38px;
+    border: none;
+    border-left: 1px solid #edf0f5;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    background: #f8fafc;
+}
+QComboBox#modernCombo::drop-down:hover { background: #eef5ff; }
+QComboBox#modernCombo::down-arrow { image: none; }
 QToolButton#language {
     background: #ffffff;
     border: 1px solid #d5dce6;
@@ -209,6 +237,58 @@ class SuccessIcon(QWidget):
         check.lineTo(QPointF(8.6, 13.1))
         check.lineTo(QPointF(14.7, 6.9))
         painter.drawPath(check)
+
+
+class ModernCheckBox(QCheckBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("modernCheck")
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self.isChecked():
+            return
+
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        indicator = self.style().subElementRect(
+            QStyle.SubElement.SE_CheckBoxIndicator,
+            option,
+            self,
+        )
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pen = QPen(QColor("#ffffff"), 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        check = QPainterPath(
+            QPointF(indicator.left() + 4.2, indicator.center().y())
+        )
+        check.lineTo(QPointF(indicator.left() + 7.5, indicator.bottom() - 4.2))
+        check.lineTo(QPointF(indicator.right() - 3.5, indicator.top() + 4.7))
+        painter.drawPath(check)
+
+
+class ModernComboBox(QComboBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("modernCombo")
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pen = QPen(QColor("#64748b"), 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        center_x = self.width() - 19
+        center_y = self.height() / 2.0
+        chevron = QPainterPath(QPointF(center_x - 4.5, center_y - 2.0))
+        chevron.lineTo(QPointF(center_x, center_y + 2.5))
+        chevron.lineTo(QPointF(center_x + 4.5, center_y - 2.0))
+        painter.drawPath(chevron)
 
 
 def build_ui_font() -> QFont:
@@ -554,7 +634,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.token_entry = QLineEdit()
         self.token_entry.setEchoMode(QLineEdit.EchoMode.Password)
         self.token_entry.textChanged.connect(self.invalidate_settings_connection)
-        self.show_token_checkbox = QCheckBox()
+        self.show_token_checkbox = ModernCheckBox()
         self.show_token_checkbox.toggled.connect(self.toggle_token_visibility)
         token_row.addWidget(self.token_entry, 1)
         token_row.addWidget(self.show_token_checkbox)
@@ -583,12 +663,12 @@ class OxfordToNotionWindow(QMainWindow):
         preferences.addSpacing(4)
         self.history_target_label = QLabel()
         preferences.addWidget(self.history_target_label)
-        self.history_target_combo = QComboBox()
+        self.history_target_combo = ModernComboBox()
         self.history_target_combo.addItem("", HISTORY_LINK_TARGET_NOTION)
         self.history_target_combo.addItem("", HISTORY_LINK_TARGET_OXFORD)
         preferences.addWidget(self.history_target_combo)
         preferences.addSpacing(10)
-        self.performance_diagnostics_checkbox = QCheckBox()
+        self.performance_diagnostics_checkbox = ModernCheckBox()
         preferences.addWidget(self.performance_diagnostics_checkbox)
         self.performance_note_label = QLabel(objectName="muted")
         self.performance_note_label.setWordWrap(True)
