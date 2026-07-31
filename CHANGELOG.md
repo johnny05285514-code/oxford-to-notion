@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## v1.5.1 — 2026-08-01
+
+### 简体中文
+
+- 修复最小窗口下设置页控件重叠，内容改为纵向滚动且不会横向裁切。
+- 修复切换中英文或刷新历史时窗口自动变大的问题。
+- 修复导入页英文长标题被裁切，标题和副标题现在会自动换行。
+- 修复“最近导入”列表第一行缺少上边框的问题。
+
+### English
+
+- Fixed overlapping Settings controls at the minimum window size by adding vertical scrolling without horizontal clipping.
+- Stopped language changes and history refreshes from automatically enlarging the window.
+- Fixed clipped long English headings on the Import page by allowing titles and subtitles to wrap.
+- Restored the missing top border on the first Recent item.
+
 ## v1.5.0 — 2026-07-31
 
 ### 简体中文

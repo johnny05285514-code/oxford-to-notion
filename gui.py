@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, QTimer, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -147,7 +147,11 @@ QPushButton#historyItem:hover, QPushButton#recentItem:hover {
     border-color: #bdd6fb;
 }
 QPushButton#recentItem { border-radius: 0; border-top: none; }
-QPushButton#recentItem:first { border-top: 1px solid #e0e6ee; border-radius: 10px 10px 0 0; }
+QPushButton#recentItem[firstItem="true"] {
+    border-top: 1px solid #e0e6ee;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
 QFrame#settingsGroup, QFrame#updateBanner {
     background: #ffffff;
     border: 1px solid #e0e6ee;
@@ -401,9 +405,11 @@ class OxfordToNotionWindow(QMainWindow):
         layout = self._page_layout(page)
         self.main_title_label = QLabel(objectName="pageTitle")
         self.main_title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.main_title_label.setWordWrap(True)
         layout.addWidget(self.main_title_label)
         self.subtitle_label = QLabel(objectName="pageSubtitle")
         self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle_label.setWordWrap(True)
         layout.addSpacing(10)
         layout.addWidget(self.subtitle_label)
         layout.addSpacing(32)
@@ -418,7 +424,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.import_button = QPushButton(objectName="primary")
         self.import_button.clicked.connect(self.start_import)
         form_layout.addWidget(self.import_button)
-        layout.addWidget(form, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(form)
 
         self.status_label = QLabel(objectName="muted")
         self.status_label.setWordWrap(True)
@@ -493,6 +499,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_title_label = QLabel(objectName="pageTitle")
         layout.addWidget(self.recent_title_label)
         self.recent_subtitle_label = QLabel(objectName="pageSubtitle")
+        self.recent_subtitle_label.setWordWrap(True)
         layout.addSpacing(8)
         layout.addWidget(self.recent_subtitle_label)
         layout.addSpacing(28)
@@ -520,9 +527,16 @@ class OxfordToNotionWindow(QMainWindow):
         return group, layout
 
     def _build_settings_page(self) -> QWidget:
-        page = QWidget(objectName="page")
-        layout = self._page_layout(page)
+        page = QScrollArea(objectName="page")
+        page.setWidgetResizable(True)
+        page.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        page.setFrameShape(QFrame.Shape.NoFrame)
+        self.settings_scroll = page
+        self.settings_content = QWidget(objectName="page")
+        layout = self._page_layout(self.settings_content)
+        layout.setContentsMargins(44, 48, 44, 38)
         self.settings_title_label = QLabel(objectName="pageTitle")
+        self.settings_title_label.setWordWrap(True)
         layout.addWidget(self.settings_title_label)
         self.settings_note_label = QLabel(objectName="pageSubtitle")
         self.settings_note_label.setWordWrap(True)
@@ -603,6 +617,8 @@ class OxfordToNotionWindow(QMainWindow):
         actions.addWidget(self.settings_save_button)
         layout.addSpacing(20)
         layout.addLayout(actions)
+        self.settings_content.setMinimumHeight(layout.sizeHint().height())
+        page.setWidget(self.settings_content)
         return page
 
     @Slot(str)
@@ -614,7 +630,6 @@ class OxfordToNotionWindow(QMainWindow):
             save_app_language(self.language)
         except AppError:
             self.set_status(self.translator.text("language_save_warning"), "#b45309")
-        self.schedule_content_fit()
 
     def retranslate_ui(self) -> None:
         text = self.translator.text
@@ -763,7 +778,6 @@ class OxfordToNotionWindow(QMainWindow):
         self.refresh_history(self.history_adder(result.word, result.page_url, result.oxford_url))
         self.word_entry.clear()
         self.word_entry.setFocus()
-        self.schedule_content_fit()
 
     @Slot(str)
     def finish_error(self, message: str) -> None:
@@ -833,8 +847,9 @@ class OxfordToNotionWindow(QMainWindow):
             button = self._history_button(item, "historyItem")
             self.history_grid.addWidget(button, index // 3, index % 3)
             self.history_buttons.append(button)
-        for item in history:
+        for index, item in enumerate(history):
             button = self._history_button(item, "recentItem")
+            button.setProperty("firstItem", index == 0)
             self.recent_layout.addWidget(button)
             self.recent_buttons.append(button)
         self.recent_empty_label = QLabel(self.translator.text("recent_empty"), objectName="muted")
@@ -844,17 +859,6 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_layout.addStretch(1)
         self.history_section.setVisible(bool(self.history_buttons))
         self.history_spacing.setVisible(bool(self.history_buttons))
-        self.schedule_content_fit()
-
-    def schedule_content_fit(self) -> None:
-        QTimer.singleShot(0, self.grow_window_to_fit_content)
-
-    def grow_window_to_fit_content(self) -> None:
-        if self.stack.currentWidget() is self.recent_page:
-            return
-        required_height = self.sizeHint().height()
-        if required_height > self.height():
-            self.resize(self.width(), required_height)
 
     @Slot()
     def start_update_check(self) -> None:

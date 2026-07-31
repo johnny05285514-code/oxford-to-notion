@@ -401,13 +401,17 @@ def test_english_success_history_and_footer_do_not_overlap(monkeypatch):
     window.close()
 
 
-def test_language_change_and_history_refresh_schedule_content_fit(monkeypatch):
-    _app, window, _saved = make_window(monkeypatch)
-    calls = []
-    window.schedule_content_fit = lambda: calls.append("fit")
+def test_language_change_does_not_resize_minimum_window(monkeypatch):
+    app, window, _saved = make_window(monkeypatch)
+    window.show_settings_page()
+    window.show()
+    app.processEvents()
+    window.resize(window.minimumSize())
+    app.processEvents()
+    size_before = window.size()
 
     window.set_language("en")
-    window.refresh_history([item("brutality")])
+    app.processEvents()
 
-    assert calls == ["fit", "fit"]
+    assert window.size() == size_before
     window.close()

@@ -11,6 +11,7 @@ from settings_store import StoredNotionSettings
 
 def make_window(monkeypatch, *, saved_language="zh-CN"):
     app = QApplication.instance() or QApplication([])
+    app.setFont(gui.build_ui_font())
     monkeypatch.setattr(
         gui,
         "read_notion_settings",
@@ -88,21 +89,15 @@ def test_missing_saved_language_uses_detected_system_language(monkeypatch):
     window.close()
 
 
-def test_history_target_control_does_not_clip_settings_actions(monkeypatch):
-    app, window, _saved = make_window(monkeypatch)
-    window.resize(window.minimumSize())
-    window.show_settings_page()
+def test_settings_page_scrolls_instead_of_compressing_groups(monkeypatch):
+    app, window, _saved = make_window(monkeypatch, saved_language="en")
     window.show()
     app.processEvents()
+    window.resize(window.minimumSize())
+    window.show_settings_page()
+    app.processEvents()
 
-    button_bottom = window.settings_save_button.mapTo(
-        window,
-        window.settings_save_button.rect().bottomLeft(),
-    ).y()
-    content_bottom = window.centralWidget().mapTo(
-        window,
-        window.centralWidget().rect().bottomLeft(),
-    ).y()
-
-    assert button_bottom <= content_bottom
+    assert hasattr(window, "settings_scroll")
+    assert window.settings_scroll.verticalScrollBar().maximum() > 0
+    assert window.settings_content.width() <= window.settings_scroll.viewport().width()
     window.close()

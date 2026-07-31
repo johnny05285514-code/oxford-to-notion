@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtWidgets import QApplication
 
 import gui
@@ -58,3 +59,34 @@ def test_recent_page_lists_all_saved_history_while_import_shows_five(monkeypatch
     assert len(window.recent_buttons) == 8
     window.close()
     assert app is not None
+
+
+def test_import_title_wraps_without_clipping_at_minimum_size(monkeypatch):
+    app, window = _make_window(monkeypatch, [])
+    window.show()
+    app.processEvents()
+    window.resize(window.minimumSize())
+    app.processEvents()
+
+    label = window.main_title_label
+    wrapped_height = label.fontMetrics().boundingRect(
+        QRect(0, 0, label.width(), 1000),
+        Qt.TextFlag.TextWordWrap | Qt.AlignmentFlag.AlignCenter,
+        label.text(),
+    ).height()
+
+    assert label.height() >= wrapped_height
+    window.close()
+
+
+def test_recent_first_item_draws_a_top_border(monkeypatch):
+    app, window = _make_window(monkeypatch, [_item("privilege")])
+    window.show_recent_page()
+    window.show()
+    app.processEvents()
+
+    image = window.recent_buttons[0].grab().toImage()
+    center_x = image.width() // 2
+
+    assert image.pixelColor(center_x, 0) != image.pixelColor(center_x, 5)
+    window.close()
