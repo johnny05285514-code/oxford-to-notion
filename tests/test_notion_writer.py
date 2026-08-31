@@ -4,7 +4,7 @@ import pytest
 import httpx
 from notion_client.errors import RequestTimeoutError
 
-from exceptions import NotionSchemaError, NotionWriteError
+from exceptions import NotionSchemaError, NotionSyncError, NotionWriteError
 from models import Definition, WordEntry
 from notion_writer import NotionWriter, build_blocks, build_properties, rich_text
 
@@ -123,13 +123,71 @@ def test_upsert_updates_existing_page_without_deleting_unmanaged_children():
     client.blocks.delete = lambda **kwargs: client.blocks.calls.append(("delete", kwargs)) or {}
     _configure_managed_append(client)
 
-    url = NotionWriter(client, "database-id").upsert(ENTRY)
+    url = NotionWriter(
+        client,
+        "database-id",
+        today=lambda: date(2026, 9, 1),
+    ).upsert(ENTRY)
 
     assert url == "https://notion/existing"
     assert ("delete", {"block_id": "old-block"}) not in client.blocks.calls
     assert client.blocks.children.calls[-1][0] == "append"
     update = next(kwargs for name, kwargs in client.pages.calls if name == "update")
-    assert "Added Date" not in update["properties"]
+    assert update["properties"]["Added Date"]["date"]["start"] == "2026-09-01"
+
+
+def recent_page(
+    word="emitted",
+    added="2026-09-01",
+    source_url="https://oxford.test/emit",
+):
+    return {
+        "id": f"page-{word}",
+        "url": f"https://notion.so/{word}",
+        "properties": {
+            "Word": {"type": "rich_text", "rich_text": [{"plain_text": word}]},
+            "Source URL": {"type": "url", "url": source_url},
+            "Added Date": {"type": "date", "date": {"start": added}},
+        },
+    }
+
+
+def test_list_recent_queries_one_sorted_page_and_normalizes_records():
+    client = FakeClient([recent_page()])
+    writer = NotionWriter(client, "database-id")
+
+    items = writer.list_recent()
+
+    assert [item.word for item in items] == ["emitted"]
+    assert items[0].page_url == "https://notion.so/emitted"
+    assert items[0].oxford_url == "https://oxford.test/emit"
+    name, kwargs = client.data_sources.calls[-1]
+    assert name == "query"
+    assert kwargs["page_size"] == 100
+    assert kwargs["sorts"] == [
+        {"property": "Added Date", "direction": "descending"}
+    ]
+
+
+def test_list_recent_skips_malformed_individual_pages():
+    malformed = recent_page(word="")
+    malformed["url"] = "javascript:alert(1)"
+    client = FakeClient([malformed, recent_page(word="valid")])
+
+    assert [
+        item.word for item in NotionWriter(client, "database-id").list_recent()
+    ] == ["valid"]
+
+
+def test_list_recent_wraps_notion_transport_failures():
+    client = FakeClient([])
+    client.data_sources = Endpoint(
+        retrieve={"properties": REQUIRED_SCHEMA},
+        query=RequestTimeoutError(),
+    )
+
+    with pytest.raises(NotionSyncError, match="Notion recent history request failed"):
+        NotionWriter(client, "database-id").list_recent()
 
 
 def _paragraph(block_id, text):

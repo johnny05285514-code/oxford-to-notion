@@ -1,13 +1,15 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from time import perf_counter
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from notion_client.errors import APIResponseError, HTTPResponseError, RequestTimeoutError
 
-from exceptions import NotionSchemaError, NotionWriteError
+from exceptions import NotionSchemaError, NotionSyncError, NotionWriteError
+from history_store import ImportHistoryItem
 from models import WordEntry
 
 
@@ -116,6 +118,68 @@ class NotionWriter:
         self._validate_schema(schema)
         return data_source_id
 
+    @staticmethod
+    def _plain_text_property(properties: dict[str, Any], name: str) -> str:
+        prop = properties.get(name, {})
+        parts = prop.get(prop.get("type", ""), [])
+        return "".join(
+            part.get("plain_text") or part.get("text", {}).get("content", "")
+            for part in parts
+        ).strip()
+
+    @staticmethod
+    def _safe_web_url(value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return None
+        return normalized
+
+    @classmethod
+    def _recent_item(cls, page: dict[str, Any]) -> ImportHistoryItem | None:
+        properties = page.get("properties", {})
+        word = cls._plain_text_property(properties, "Word")
+        page_url = cls._safe_web_url(page.get("url"))
+        source_url = cls._safe_web_url(properties.get("Source URL", {}).get("url"))
+        added = properties.get("Added Date", {}).get("date") or {}
+        added_at = added.get("start", "")
+        if not word or not page_url or not isinstance(added_at, str):
+            return None
+        try:
+            datetime.fromisoformat(added_at)
+        except ValueError:
+            return None
+        return ImportHistoryItem(word.strip().lower(), page_url, added_at, source_url)
+
+    def list_recent(self, limit: int = 100) -> list[ImportHistoryItem]:
+        bounded_limit = max(1, min(limit, 100))
+        try:
+            data_source_id, schema = self._resolve_data_source()
+            self._validate_schema(schema)
+            response = self.client.data_sources.query(
+                data_source_id=data_source_id,
+                sorts=[{"property": "Added Date", "direction": "descending"}],
+                page_size=bounded_limit,
+            )
+            items = [
+                item
+                for page in response.get("results", [])
+                if (item := self._recent_item(page)) is not None
+            ]
+            return items[:bounded_limit]
+        except NotionSchemaError:
+            raise
+        except (
+            APIResponseError,
+            HTTPResponseError,
+            RequestTimeoutError,
+            httpx.RequestError,
+            OSError,
+        ) as exc:
+            raise NotionSyncError("Notion recent history request failed.") from exc
+
     def upsert(self, entry: WordEntry) -> str:
         self.last_timing = None
         started_at = self.clock()
@@ -137,7 +201,7 @@ class NotionWriter:
                 try:
                     updated = self.client.pages.update(
                         page_id=page["id"],
-                        properties=build_properties(entry),
+                        properties=build_properties(entry, self.today()),
                     )
                 except Exception:
                     try:

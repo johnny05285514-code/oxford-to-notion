@@ -40,3 +40,7 @@ class NotionSchemaError(NotionError):
 
 class NotionWriteError(NotionError):
     pass
+
+
+class NotionSyncError(NotionError):
+    pass
