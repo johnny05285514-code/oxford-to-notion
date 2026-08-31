@@ -11,6 +11,9 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
+rem Keep unrelated tools on the parent PATH from supplying incompatible DLLs.
+set "PATH=%SystemRoot%\System32;%SystemRoot%;%~dp0.venv\Scripts"
+
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^

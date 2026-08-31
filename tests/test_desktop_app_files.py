@@ -11,6 +11,14 @@ def test_build_script_creates_windowed_executable_without_bundling_env():
     assert "--add-data \".env" not in content
 
 
+def test_build_script_isolates_path_before_pyinstaller_runs():
+    content = Path("build_app.bat").read_text(encoding="utf-8")
+
+    path_guard = 'set "PATH=%SystemRoot%\\System32;%SystemRoot%;%~dp0.venv\\Scripts"'
+    assert path_guard in content
+    assert content.index(path_guard) < content.index("-m PyInstaller")
+
+
 def test_gui_dependencies_are_declared():
     requirements = Path("requirements.txt").read_text(encoding="utf-8")
     assert "PySide6-Essentials" in requirements
