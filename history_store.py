@@ -60,6 +60,46 @@ def read_history(path: Path | None = None) -> list[ImportHistoryItem]:
     return items[:MAX_HISTORY_ITEMS]
 
 
+def _validated_items(items: list[ImportHistoryItem]) -> list[ImportHistoryItem]:
+    validated = [
+        parsed
+        for item in items
+        if (parsed := _parse_item(asdict(item))) is not None
+    ]
+    return validated[:MAX_HISTORY_ITEMS]
+
+
+def _write_history_items(
+    items: list[ImportHistoryItem],
+    target: Path,
+) -> list[ImportHistoryItem]:
+    validated = _validated_items(items)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    payload = {"items": [asdict(item) for item in validated]}
+    try:
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary.replace(target)
+    except OSError:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return read_history(target)
+    return validated
+
+
+def replace_history_items(
+    items: list[ImportHistoryItem],
+    *,
+    path: Path | None = None,
+) -> list[ImportHistoryItem]:
+    return _write_history_items(items, path or default_history_path())
+
+
 def add_history_item(
     word: str,
     page_url: str,
@@ -87,18 +127,4 @@ def add_history_item(
     existing = [item for item in read_history(target) if item.word != normalized_word]
     items = [newest, *existing][:MAX_HISTORY_ITEMS]
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    payload = {"items": [asdict(item) for item in items]}
-    try:
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        temporary.replace(target)
-    except OSError:
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
-    return items
+    return _write_history_items(items, target)

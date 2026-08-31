@@ -1,7 +1,12 @@
 import json
 from datetime import datetime, timezone
 
-from history_store import add_history_item, read_history
+from history_store import (
+    ImportHistoryItem,
+    add_history_item,
+    read_history,
+    replace_history_items,
+)
 
 
 NOW = datetime(2026, 7, 12, 1, 2, 3, tzinfo=timezone.utc)
@@ -116,3 +121,37 @@ def test_add_history_rejects_unsafe_url_without_touching_file(tmp_path):
 
     assert add_history_item("bad", "javascript:alert(1)", path=path) == []
     assert not path.exists()
+
+
+def test_replace_history_items_atomically_replaces_cache(tmp_path):
+    path = tmp_path / "nested" / "history.json"
+    old = ImportHistoryItem("old", "https://notion.so/old", "2026-08-01")
+    new = ImportHistoryItem(
+        "emitted",
+        "https://notion.so/emitted",
+        "2026-09-01",
+        "https://www.oxfordlearnersdictionaries.com/definition/english/emit",
+    )
+    replace_history_items([old], path=path)
+
+    result = replace_history_items([new], path=path)
+
+    assert result == [new]
+    assert read_history(path) == [new]
+    assert not path.with_suffix(".tmp").exists()
+
+
+def test_replace_history_items_discards_invalid_and_limits_to_one_hundred(tmp_path):
+    path = tmp_path / "history.json"
+    valid = [
+        ImportHistoryItem(f"word-{index}", f"https://notion.so/{index}", "2026-09-01")
+        for index in range(105)
+    ]
+    unsafe = ImportHistoryItem("unsafe", "javascript:alert(1)", "2026-09-01")
+
+    result = replace_history_items([unsafe, *valid], path=path)
+
+    assert len(result) == 100
+    assert result[0].word == "word-0"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert len(payload["items"]) == 100
