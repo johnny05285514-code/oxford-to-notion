@@ -1138,12 +1138,19 @@ class OxfordToNotionWindow(QMainWindow):
         self.start_recent_sync(force=True)
 
 
-def main() -> int:
-    app = QApplication(sys.argv)
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv if argv is None else argv)
+    app = QApplication.instance() or QApplication(args)
     app.setApplicationName("Oxford to Notion")
     app.setFont(build_ui_font())
     app.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
-    window = OxfordToNotionWindow(enable_recent_sync=True)
+    smoke_test = "--smoke-test" in args
+    window = OxfordToNotionWindow(
+        start_update_check=not smoke_test,
+        enable_recent_sync=not smoke_test,
+    )
+    if smoke_test:
+        return 0
     window.show()
     return app.exec()
 

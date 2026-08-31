@@ -19,6 +19,14 @@ def test_build_script_isolates_path_before_pyinstaller_runs():
     assert content.index(path_guard) < content.index("-m PyInstaller")
 
 
+def test_build_script_smoke_tests_the_packaged_executable():
+    content = Path("build_app.bat").read_text(encoding="utf-8")
+
+    invocation = '"dist\\Oxford to Notion.exe" --smoke-test'
+    assert invocation in content
+    assert "if errorlevel 1" in content[content.index(invocation) :]
+
+
 def test_gui_dependencies_are_declared():
     requirements = Path("requirements.txt").read_text(encoding="utf-8")
     assert "PySide6-Essentials" in requirements

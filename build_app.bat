@@ -31,6 +31,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+"dist\Oxford to Notion.exe" --smoke-test
+if errorlevel 1 (
+    echo.
+    echo Packaged application smoke test failed.
+    if /i not "%~1"=="--no-pause" pause
+    exit /b 1
+)
+
 echo.
 echo Build complete:
 echo %~dp0dist\Oxford to Notion.exe
