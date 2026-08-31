@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Callable
+from time import monotonic
 
 from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPainterPath, QPen
@@ -29,6 +30,7 @@ from i18n import Translator, detect_system_language, localize_error
 from import_service import ImportResult, import_word
 from language_menu import LanguageMenuButton
 from oxford_client import build_oxford_search_url
+from recent_sync import sync_recent_history
 from settings_store import (
     HISTORY_LINK_TARGET_NOTION,
     HISTORY_LINK_TARGET_OXFORD,
@@ -344,6 +346,30 @@ class UpdateWorker(QRunnable):
             pass
 
 
+RECENT_SYNC_INTERVAL_SECONDS = 60.0
+
+
+class RecentSyncSignals(QObject):
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+
+class RecentSyncWorker(QRunnable):
+    def __init__(self, sync_func: Callable[[], list[ImportHistoryItem]]) -> None:
+        super().__init__()
+        self.sync_func = sync_func
+        self.signals = RecentSyncSignals()
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            items = self.sync_func()
+        except Exception as exc:
+            self.signals.failed.emit(str(exc))
+        else:
+            self.signals.succeeded.emit(items)
+
+
 class OxfordToNotionWindow(QMainWindow):
     def __init__(
         self,
@@ -353,16 +379,26 @@ class OxfordToNotionWindow(QMainWindow):
         history_adder: Callable[[str, str, str], list[ImportHistoryItem]] = add_history_item,
         update_func: Callable[[], UpdateInfo | None] = check_for_update,
         start_update_check: bool = True,
+        recent_sync_func: Callable[[], list[ImportHistoryItem]] = sync_recent_history,
+        enable_recent_sync: bool = False,
+        recent_sync_clock: Callable[[], float] = monotonic,
     ) -> None:
         super().__init__()
         self.import_func = import_func
         self.history_reader = history_reader
         self.history_adder = history_adder
         self.update_func = update_func
+        self.recent_sync_func = recent_sync_func
+        self.enable_recent_sync = enable_recent_sync
+        self.recent_sync_clock = recent_sync_clock
         self.thread_pool = QThreadPool(self)
         self.thread_pool.setMaxThreadCount(1)
         self.update_thread_pool = QThreadPool(self)
         self.update_thread_pool.setMaxThreadCount(1)
+        self.recent_sync_thread_pool = QThreadPool(self)
+        self.recent_sync_thread_pool.setMaxThreadCount(1)
+        self._recent_sync_running = False
+        self._last_recent_sync_attempt: float | None = None
         self.current_page_url = ""
         self.current_history: list[ImportHistoryItem] = []
         self.update_info: UpdateInfo | None = None
@@ -421,6 +457,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.show_update(None)
         if stored.is_complete:
             self.show_main_page()
+            self.start_recent_sync(force=True)
         else:
             self.show_wizard_page()
         if start_update_check:
@@ -581,6 +618,10 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_subtitle_label.setWordWrap(True)
         layout.addSpacing(8)
         layout.addWidget(self.recent_subtitle_label)
+        self.recent_sync_notice = QLabel(objectName="muted")
+        self.recent_sync_notice.setWordWrap(True)
+        self.recent_sync_notice.hide()
+        layout.addWidget(self.recent_sync_notice)
         layout.addSpacing(22)
         self.recent_search_entry = QLineEdit()
         self.recent_search_entry.setClearButtonEnabled(True)
@@ -731,6 +772,8 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_title.setText(text("recently_imported"))
         self.recent_title_label.setText(text("recently_imported"))
         self.recent_subtitle_label.setText(text("recent_subtitle"))
+        if not self.recent_sync_notice.isHidden():
+            self.recent_sync_notice.setText(text("recent_sync_cached"))
         self.recent_search_entry.setPlaceholderText(text("recent_search_placeholder"))
         self.filter_recent_history(self.recent_search_entry.text())
         self.settings_title_label.setText(text("settings_title"))
@@ -787,6 +830,7 @@ class OxfordToNotionWindow(QMainWindow):
     @Slot()
     def show_recent_page(self) -> None:
         self.refresh_history()
+        self.start_recent_sync()
         self.stack.setCurrentWidget(self.recent_page)
         self._set_active_nav(self.nav_recent_button)
         self._set_toolbar_title("nav_recent")
@@ -827,6 +871,7 @@ class OxfordToNotionWindow(QMainWindow):
             return
         self.show_main_page()
         self.set_status_key("setup_complete", "#15803d", success=True)
+        self.start_recent_sync(force=True)
 
     @Slot()
     def start_import(self) -> None:
@@ -861,6 +906,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.open_spacing.show()
         self.open_button.show()
         self.refresh_history(self.history_adder(result.word, result.page_url, result.oxford_url))
+        self.start_recent_sync(force=True)
         self.word_entry.clear()
         self.word_entry.setFocus()
 
@@ -959,6 +1005,35 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_empty_label.setVisible(not self.recent_buttons)
         self.recent_layout.addWidget(self.recent_empty_label)
         self.recent_layout.addStretch(1)
+
+    def start_recent_sync(self, *, force: bool = False) -> None:
+        if not self.enable_recent_sync or self._recent_sync_running:
+            return
+        now = self.recent_sync_clock()
+        if (
+            not force
+            and self._last_recent_sync_attempt is not None
+            and now - self._last_recent_sync_attempt < RECENT_SYNC_INTERVAL_SECONDS
+        ):
+            return
+        self._last_recent_sync_attempt = now
+        self._recent_sync_running = True
+        worker = RecentSyncWorker(self.recent_sync_func)
+        worker.signals.succeeded.connect(self.finish_recent_sync)
+        worker.signals.failed.connect(self.fail_recent_sync)
+        self.recent_sync_thread_pool.start(worker)
+
+    @Slot(object)
+    def finish_recent_sync(self, items: list[ImportHistoryItem]) -> None:
+        self._recent_sync_running = False
+        self.recent_sync_notice.hide()
+        self.refresh_history(items)
+
+    @Slot(str)
+    def fail_recent_sync(self, _message: str) -> None:
+        self._recent_sync_running = False
+        self.recent_sync_notice.setText(self.translator.text("recent_sync_cached"))
+        self.recent_sync_notice.show()
 
     @Slot()
     def start_update_check(self) -> None:
@@ -1060,6 +1135,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.refresh_history()
         self.show_main_page()
         self.set_status_key("settings_saved", "#15803d", success=True)
+        self.start_recent_sync(force=True)
 
 
 def main() -> int:
@@ -1067,7 +1143,7 @@ def main() -> int:
     app.setApplicationName("Oxford to Notion")
     app.setFont(build_ui_font())
     app.setWindowIcon(QIcon(str(resource_path("assets/app-icon.png"))))
-    window = OxfordToNotionWindow()
+    window = OxfordToNotionWindow(enable_recent_sync=True)
     window.show()
     return app.exec()
 

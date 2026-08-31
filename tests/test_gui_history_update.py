@@ -14,12 +14,25 @@ from settings_store import StoredNotionSettings
 from update_checker import UpdateInfo
 
 
+class HoldingThreadPool:
+    def __init__(self, *_args):
+        self.jobs = []
+
+    def setMaxThreadCount(self, _count):
+        pass
+
+    def start(self, worker):
+        self.jobs.append(worker)
+
+
 def make_window(
     monkeypatch,
     *,
     history=None,
     history_adder=None,
     history_link_target="notion",
+    recent_sync_func=lambda: [],
+    enable_recent_sync=False,
 ):
     app = QApplication.instance() or QApplication([])
     monkeypatch.setattr(
@@ -32,9 +45,13 @@ def make_window(
     monkeypatch.setattr(gui, "read_history_link_target", lambda: history_link_target)
     saved_targets = []
     monkeypatch.setattr(gui, "save_history_link_target", saved_targets.append)
+    if enable_recent_sync:
+        monkeypatch.setattr(gui, "QThreadPool", HoldingThreadPool)
     window = OxfordToNotionWindow(
         history_reader=lambda: list(history or []),
         history_adder=history_adder or (lambda *_args: list(history or [])),
+        recent_sync_func=recent_sync_func,
+        enable_recent_sync=enable_recent_sync,
         start_update_check=False,
     )
     return app, window, saved_targets
@@ -495,4 +512,106 @@ def test_language_change_does_not_resize_minimum_window(monkeypatch):
     app.processEvents()
 
     assert window.size() == size_before
+    window.close()
+
+
+def test_recent_sync_success_replaces_visible_history(monkeypatch):
+    cached = [item("cached")]
+    synced = [item("windows-word"), item("mac-word")]
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history=cached,
+        recent_sync_func=lambda: synced,
+        enable_recent_sync=True,
+    )
+    worker = window.recent_sync_thread_pool.jobs[-1]
+
+    worker.run()
+
+    assert [entry.word for entry in window.current_history] == [
+        "windows-word",
+        "mac-word",
+    ]
+    assert window.recent_sync_notice.isHidden()
+    window.close()
+
+
+def test_recent_sync_failure_keeps_cache_and_shows_notice(monkeypatch):
+    cached = [item("cached")]
+
+    def fail():
+        raise RuntimeError("offline")
+
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history=cached,
+        recent_sync_func=fail,
+        enable_recent_sync=True,
+    )
+    window.recent_sync_thread_pool.jobs[-1].run()
+
+    assert [entry.word for entry in window.current_history] == ["cached"]
+    assert "本机记录" in window.recent_sync_notice.text()
+    window.close()
+
+
+def test_recent_sync_honors_sixty_seconds_and_one_running_job(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch, enable_recent_sync=False)
+    now = [0.0]
+    window.recent_sync_clock = lambda: now[0]
+    window.recent_sync_thread_pool = HoldingThreadPool()
+    window.enable_recent_sync = True
+
+    window.start_recent_sync()
+    window.start_recent_sync()
+    assert len(window.recent_sync_thread_pool.jobs) == 1
+
+    window._recent_sync_running = False
+    now[0] = 30.0
+    window.start_recent_sync()
+    assert len(window.recent_sync_thread_pool.jobs) == 1
+
+    now[0] = 61.0
+    window.start_recent_sync()
+    assert len(window.recent_sync_thread_pool.jobs) == 2
+    window.close()
+
+
+def test_successful_import_is_immediate_and_forces_recent_sync(monkeypatch):
+    local = [item("emitted")]
+    _app, window, _saved = make_window(
+        monkeypatch,
+        history_adder=lambda *_args: local,
+        enable_recent_sync=False,
+    )
+    window.recent_sync_thread_pool = HoldingThreadPool()
+    window.enable_recent_sync = True
+
+    window.finish_success(
+        ImportResult(
+            "emitted",
+            "https://www.notion.so/emitted",
+            "https://www.oxfordlearnersdictionaries.com/definition/english/emit",
+        )
+    )
+
+    assert [entry.word for entry in window.current_history] == ["emitted"]
+    assert len(window.recent_sync_thread_pool.jobs) == 1
+    window.close()
+
+
+def test_recent_sync_failure_notice_retranslates(monkeypatch):
+    def fail():
+        raise RuntimeError("offline")
+
+    _app, window, _saved = make_window(
+        monkeypatch,
+        recent_sync_func=fail,
+        enable_recent_sync=True,
+    )
+    window.recent_sync_thread_pool.jobs[-1].run()
+
+    window.set_language("en")
+
+    assert "cached history" in window.recent_sync_notice.text()
     window.close()

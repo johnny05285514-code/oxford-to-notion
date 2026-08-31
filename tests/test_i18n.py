@@ -28,3 +28,10 @@ def test_missing_chinese_translation_falls_back_to_english():
 
 def test_unknown_language_is_normalized_to_english():
     assert Translator("es").language == "en"
+
+
+def test_recent_sync_copy_is_available_in_both_languages():
+    assert "Notion" in Translator("en").text("recent_subtitle")
+    assert "cached history" in Translator("en").text("recent_sync_cached")
+    assert "Notion" in Translator("zh-CN").text("recent_subtitle")
+    assert "本机记录" in Translator("zh-CN").text("recent_sync_cached")
