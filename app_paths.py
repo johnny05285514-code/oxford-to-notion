@@ -6,6 +6,8 @@ from pathlib import Path
 def app_directory() -> Path:
     """Return the folder that should hold user-editable app files."""
     if getattr(sys, "frozen", False):
+        if sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / "Oxford to Notion"
         app_data = os.getenv("APPDATA")
         base = Path(app_data) if app_data else Path.home() / "AppData" / "Roaming"
         return base / "Oxford to Notion"

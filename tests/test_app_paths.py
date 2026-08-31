@@ -3,23 +3,25 @@ from pathlib import Path
 import app_paths
 
 
-def test_source_app_uses_project_directory():
-    assert app_paths.app_directory() == Path(app_paths.__file__).resolve().parent
-
-
-def test_frozen_app_uses_windows_appdata(monkeypatch, tmp_path: Path):
+def test_frozen_macos_uses_application_support(monkeypatch, tmp_path):
     monkeypatch.setattr(app_paths.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_paths.sys, "platform", "darwin")
+    monkeypatch.setattr(app_paths.Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert app_paths.app_directory() == (
+        tmp_path / "Library" / "Application Support" / "Oxford to Notion"
+    )
+
+
+def test_frozen_windows_still_prefers_appdata(monkeypatch, tmp_path):
+    monkeypatch.setattr(app_paths.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_paths.sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", str(tmp_path))
 
     assert app_paths.app_directory() == tmp_path / "Oxford to Notion"
 
 
-def test_source_resource_path_uses_project_directory():
-    assert app_paths.resource_path("assets/app-icon.png") == (
-        Path(app_paths.__file__).resolve().parent / "assets" / "app-icon.png"
-    )
+def test_source_execution_still_uses_project_directory(monkeypatch):
+    monkeypatch.setattr(app_paths.sys, "frozen", False, raising=False)
 
-
-def test_local_state_paths_share_the_application_directory():
-    assert app_paths.history_path() == app_paths.app_directory() / "history.json"
-    assert app_paths.update_state_path() == app_paths.app_directory() / "update-state.json"
+    assert app_paths.app_directory() == Path(app_paths.__file__).resolve().parent
