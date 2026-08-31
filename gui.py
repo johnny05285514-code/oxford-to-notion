@@ -364,6 +364,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.update_thread_pool = QThreadPool(self)
         self.update_thread_pool.setMaxThreadCount(1)
         self.current_page_url = ""
+        self.current_history: list[ImportHistoryItem] = []
         self.update_info: UpdateInfo | None = None
         self._settings_test_values: tuple[str, str] | None = None
         self._status_key = "ready"
@@ -580,7 +581,12 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_subtitle_label.setWordWrap(True)
         layout.addSpacing(8)
         layout.addWidget(self.recent_subtitle_label)
-        layout.addSpacing(28)
+        layout.addSpacing(22)
+        self.recent_search_entry = QLineEdit()
+        self.recent_search_entry.setClearButtonEnabled(True)
+        self.recent_search_entry.textChanged.connect(self.filter_recent_history)
+        layout.addWidget(self.recent_search_entry)
+        layout.addSpacing(18)
         self.recent_scroll = QScrollArea()
         self.recent_scroll.setWidgetResizable(True)
         self.recent_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -725,7 +731,8 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_title.setText(text("recently_imported"))
         self.recent_title_label.setText(text("recently_imported"))
         self.recent_subtitle_label.setText(text("recent_subtitle"))
-        self.recent_empty_label.setText(text("recent_empty"))
+        self.recent_search_entry.setPlaceholderText(text("recent_search_placeholder"))
+        self.filter_recent_history(self.recent_search_entry.text())
         self.settings_title_label.setText(text("settings_title"))
         self.settings_note_label.setText(text("settings_note"))
         self.connection_heading.setText(text("connection_heading"))
@@ -911,6 +918,7 @@ class OxfordToNotionWindow(QMainWindow):
         while layout.count():
             item = layout.takeAt(0)
             if widget := item.widget():
+                widget.hide()
                 widget.deleteLater()
 
     def refresh_history(self, items: list[ImportHistoryItem] | None = None) -> None:
@@ -918,25 +926,39 @@ class OxfordToNotionWindow(QMainWindow):
             self.history_grid.removeWidget(button)
             button.deleteLater()
         self.history_buttons.clear()
-        self._clear_layout(self.recent_layout)
-        self.recent_buttons.clear()
-        history = items if items is not None else self.history_reader()
-        for index, item in enumerate(history[:SUMMARY_HISTORY_ITEMS]):
+        self.current_history = items if items is not None else self.history_reader()
+        for index, item in enumerate(self.current_history[:SUMMARY_HISTORY_ITEMS]):
             button = self._history_button(item, "historyItem")
             self.history_grid.addWidget(button, index // 3, index % 3)
             self.history_buttons.append(button)
-        for index, item in enumerate(history):
+        self.filter_recent_history(self.recent_search_entry.text())
+        self.history_section.setVisible(bool(self.history_buttons))
+        self.history_spacing.setVisible(bool(self.history_buttons))
+
+    @Slot(str)
+    def filter_recent_history(self, query: str) -> None:
+        normalized = query.strip().casefold()
+        matches = [
+            item
+            for item in self.current_history
+            if not normalized or normalized in item.word.casefold()
+        ]
+        self._render_recent_history(matches)
+
+    def _render_recent_history(self, items: list[ImportHistoryItem]) -> None:
+        self._clear_layout(self.recent_layout)
+        self.recent_buttons.clear()
+        for index, item in enumerate(items):
             button = self._history_button(item, "recentItem")
             button.setProperty("firstItem", index == 0)
             self.recent_layout.addWidget(button)
             self.recent_buttons.append(button)
-        self.recent_empty_label = QLabel(self.translator.text("recent_empty"), objectName="muted")
+        empty_key = "recent_empty" if not self.current_history else "recent_no_match"
+        self.recent_empty_label = QLabel(self.translator.text(empty_key), objectName="muted")
         self.recent_empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.recent_empty_label.setVisible(not self.recent_buttons)
         self.recent_layout.addWidget(self.recent_empty_label)
         self.recent_layout.addStretch(1)
-        self.history_section.setVisible(bool(self.history_buttons))
-        self.history_spacing.setVisible(bool(self.history_buttons))
 
     @Slot()
     def start_update_check(self) -> None:

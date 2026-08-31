@@ -274,6 +274,87 @@ def test_successful_import_passes_oxford_source_url_to_history(monkeypatch):
     window.close()
 
 
+def test_recent_search_matches_substrings_case_insensitively(monkeypatch):
+    history = [item(word) for word in ["wonderful", "emitted", "emitter"]]
+    _app, window, _saved = make_window(monkeypatch, history=history)
+
+    window.show_recent_page()
+    window.recent_search_entry.setText("MIT")
+
+    assert [button.property("word") for button in window.recent_buttons] == [
+        "emitted",
+        "emitter",
+    ]
+    assert window.recent_empty_label.isHidden()
+    window.close()
+
+
+def test_recent_search_shows_no_match_and_clears_back_to_all_items(monkeypatch):
+    history = [item(word) for word in ["brutality", "wonderful"]]
+    _app, window, _saved = make_window(monkeypatch, history=history)
+    window.set_language("en")
+
+    window.show_recent_page()
+    window.recent_search_entry.setText("zzz")
+
+    assert window.recent_buttons == []
+    assert window.recent_empty_label.text() == "No matching imported words."
+
+    window.recent_search_entry.setText("   ")
+
+    assert [button.property("word") for button in window.recent_buttons] == [
+        "brutality",
+        "wonderful",
+    ]
+    window.close()
+
+
+def test_recent_search_keeps_import_summary_and_filtered_link_target(monkeypatch):
+    history = [
+        item("wonderful"),
+        item("emitted", "https://www.notion.so/emitted"),
+        item("emitter", "https://www.notion.so/emitter"),
+        item("brutality"),
+        item("refusal"),
+        item("sixth"),
+    ]
+    _app, window, _saved = make_window(monkeypatch, history=history)
+    opened = []
+    monkeypatch.setattr(
+        gui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toString()),
+    )
+
+    window.show_recent_page()
+    window.recent_search_entry.setText("emit")
+
+    assert [button.property("word") for button in window.history_buttons] == [
+        "wonderful",
+        "emitted",
+        "emitter",
+        "brutality",
+        "refusal",
+    ]
+    window.recent_buttons[0].click()
+    assert opened == ["https://www.notion.so/emitted"]
+    window.close()
+
+
+def test_recent_search_hides_replaced_buttons_immediately(monkeypatch):
+    history = [item(word) for word in ["wonderful", "emitted", "emitter"]]
+    app, window, _saved = make_window(monkeypatch, history=history)
+    window.show_recent_page()
+    window.show()
+    app.processEvents()
+    original_buttons = list(window.recent_buttons)
+
+    window.recent_search_entry.setText("mit")
+
+    assert all(button.isHidden() for button in original_buttons)
+    window.close()
+
+
 def test_enabled_performance_diagnostics_shows_import_timing(monkeypatch):
     app = QApplication.instance() or QApplication([])
     monkeypatch.setattr(

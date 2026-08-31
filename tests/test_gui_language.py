@@ -56,6 +56,7 @@ def test_switching_language_retranslates_main_and_settings_pages(monkeypatch):
     assert window.language_button.toolTip() == "Language"
     assert window.settings_title_label.text() == "Notion Settings"
     assert window.settings_save_button.text() == "Save settings"
+    assert window.recent_search_entry.placeholderText() == "Search imported words"
     assert window.history_target_label.text() == "Open recent imports in"
     assert window.performance_diagnostics_checkbox.text() == "Show import performance details"
     assert [window.history_target_combo.itemText(index) for index in range(2)] == [
@@ -68,6 +69,7 @@ def test_switching_language_retranslates_main_and_settings_pages(monkeypatch):
     assert window.settings_button.text() == "设置"
     assert window.import_button.text() == "导入到 Notion"
     assert window.language_button.toolTip() == "切换语言"
+    assert window.recent_search_entry.placeholderText() == "搜索已导入的单词"
     assert window.history_target_label.text() == "最近导入打开方式"
     assert window.performance_diagnostics_checkbox.text() == "显示导入性能详情"
     assert [window.history_target_combo.itemText(index) for index in range(2)] == [
