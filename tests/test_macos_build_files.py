@@ -33,3 +33,24 @@ def test_macos_build_dependencies_are_pinned():
     assert "PySide6-Essentials==" in requirements
     assert "shiboken6==" in requirements
     assert "pyinstaller==" in requirements
+
+
+def test_macos_workflow_is_manual_arm64_and_private_artifact_only():
+    workflow = (
+        ROOT / ".github" / "workflows" / "macos-arm64-build.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in workflow
+    assert "runs-on: macos-15" in workflow
+    assert "permissions:\n  contents: read" in workflow
+    assert "actions/setup-python@v5" in workflow
+    assert "python-version: '3.13'" in workflow
+    assert "pytest" in workflow
+    assert "scripts/build_macos_app.sh" in workflow
+    assert "scripts/package_macos_dmg.sh" in workflow
+    assert "lipo -info" in workflow
+    assert "hdiutil attach" in workflow
+    assert "--smoke-test" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "retention-days: 14" in workflow
+    assert "softprops/action-gh-release" not in workflow
