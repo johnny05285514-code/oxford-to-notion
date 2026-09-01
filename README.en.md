@@ -8,7 +8,7 @@ Languages: [简体中文](README.md) | [English](README.en.md)
 
 [View the changelog](CHANGELOG.md)
 
-A Windows desktop app and Python CLI that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
+A desktop app and Python CLI that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
 <p align="center">
   <img src="assets/demo.gif" alt="Oxford to Notion demonstration" width="720">
@@ -28,13 +28,26 @@ Regular users do not need to install Python or build the project:
 
 Use the language menu in the top-right corner to switch between Simplified Chinese and English. The app remembers your choice locally for the next launch.
 
-After a successful import, the Import page shows the five most recent words. The Recent page keeps up to 100 words on this device, and clicking the Oxford to Notion name in the sidebar always returns to Import. In Settings, choose whether recent words open their Notion pages or Oxford Learner's Dictionaries. New imports open Oxford's resolved entry URL directly, reducing transient errors from the search redirect; older history items remain compatible. The optional “Show import performance details” setting is off by default; when enabled, each successful import shows Oxford lookup, Notion check, save, and total time. The app also checks GitHub quietly once per day and only shows a reminder when a newer release is available. It never installs updates automatically.
+After a successful import, the Import page shows the five most recent words. The Recent page shows up to 100 words, synced through Notion across Windows and Mac when both use the same database. Each computer also keeps a local cache for temporary offline use. Clicking the Oxford to Notion name in the sidebar always returns to Import. In Settings, choose whether recent words open their Notion pages or Oxford Learner's Dictionaries. New imports open Oxford's resolved entry URL directly, reducing transient errors from the search redirect; older history items remain compatible. The optional “Show import performance details” setting is off by default; when enabled, each successful import shows Oxford lookup, Notion check, save, and total time. The app also checks GitHub quietly once per day and only shows a reminder when a newer release is available. It never installs updates automatically.
 
 Starting with v1.4.1, generated Oxford page content lives inside a clearly marked managed section. Repeat imports replace only that section and never delete personal notes added outside it. The first repeat import of a legacy page preserves all old body content and adds the safe managed section, so Oxford content may temporarily appear twice; after checking the new section, you may remove the old Oxford paragraphs manually.
 
 The installer supports English and Simplified Chinese, an optional desktop shortcut, a Start menu entry, and normal Windows uninstall. Uninstalling the app does not automatically delete your Notion configuration.
 
 This personal open-source build is not commercially code-signed, so Windows may show an “Unknown publisher” warning. Confirm that the file came from the official GitHub repository above and optionally verify it with the `.sha256` file included in the Release.
+
+## macOS Apple silicon test build (M1, M2, M3, and M4)
+
+This is a private test build for Apple silicon (M1, M2, M3, and M4) Macs. GitHub Actions creates it; it is not a final public Release yet. You do not need to install Python:
+
+1. Download and unzip the `Oxford-to-Notion-macOS-arm64` artifact from this project's GitHub Actions run
+2. Open the included `.dmg`
+3. Drag `Oxford to Notion` into `Applications`
+4. For the first launch, right-click the app in Applications and choose `Open`
+5. Paste your Notion Token and database link into Settings on the Mac
+6. Open Recent and wait briefly for the Notion history refresh
+
+This free personal test build is unsigned and not notarized by Apple, so the first launch requires right-click → Open. The Token and database link must be entered separately on the Mac; they stay on that Mac and are never synchronized through GitHub or Recent. Recent imports are synced through Notion, while a local cache remains available during temporary network failures.
 
 ## Why I built this
 

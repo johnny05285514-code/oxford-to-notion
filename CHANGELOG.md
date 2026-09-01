@@ -1,5 +1,19 @@
 # Changelog / 更新日志
 
+## Unreleased
+
+### 简体中文
+
+- 新增 macOS ARM64 私人测试构建，支持 M1、M2、M3 和 M4 Mac。
+- “最近导入”现在通过 Notion 在 Windows 和 Mac 之间同步，并在同步失败时保留本机缓存。
+- 重复导入会刷新 `Added Date`，同时继续保留用户在管理区域外添加的个人笔记。
+
+### English
+
+- Added a private macOS ARM64 test build for M1, M2, M3, and M4 Macs.
+- Recent imports now sync through Notion across Windows and Mac, with a local cache when synchronization fails.
+- Repeat imports refresh `Added Date` while continuing to preserve personal notes outside the managed section.
+
 ## v1.5.1 — 2026-08-01
 
 ### 简体中文

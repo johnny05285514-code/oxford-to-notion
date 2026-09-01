@@ -8,7 +8,7 @@ Languages: [简体中文](README.md) | [English](README.en.md)
 
 [查看更新日志](CHANGELOG.md)
 
-一个输入英文单词，自动查询 Oxford Learner's Dictionaries，并保存到 Notion 单词库的 Windows 桌面工具。
+一个输入英文单词，自动查询 Oxford Learner's Dictionaries，并保存到 Notion 单词库的桌面工具。
 
 A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries into a Notion vocabulary database.
 
@@ -30,13 +30,26 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 
 软件右上角提供语言菜单，可随时在简体中文和 English 之间切换。选择会自动保存在本机，下次打开继续使用。
 
-导入成功后，导入页会显示最近 5 个单词；“最近导入”页面会在此设备保留最多 100 个单词。点击左侧的 Oxford to Notion 名称可以随时回到导入页。在“设置”中可以选择点击这些单词时打开对应的 Notion 页面，或者跳转到 Oxford Learner's Dictionaries。新导入的记录会直接打开 Oxford 最终词条页面，减少搜索跳转造成的临时错误；旧记录仍保持兼容。设置中的“显示导入性能详情”默认关闭；开启后会在每次成功导入后显示 Oxford 查询、Notion 检查、保存和总耗时。软件还会每天静默检查一次 GitHub 新版本，仅在发现更新时提醒，不会自动下载安装。
+导入成功后，导入页会显示最近 5 个单词；“最近导入”页面最多显示 100 个单词，并通过 Notion 同步到连接同一个数据库的 Windows 和 Mac。每台电脑也会保留本地缓存，暂时离线时仍可查看。点击左侧的 Oxford to Notion 名称可以随时回到导入页。在“设置”中可以选择点击这些单词时打开对应的 Notion 页面，或者跳转到 Oxford Learner's Dictionaries。新导入的记录会直接打开 Oxford 最终词条页面，减少搜索跳转造成的临时错误；旧记录仍保持兼容。设置中的“显示导入性能详情”默认关闭；开启后会在每次成功导入后显示 Oxford 查询、Notion 检查、保存和总耗时。软件还会每天静默检查一次 GitHub 新版本，仅在发现更新时提醒，不会自动下载安装。
 
 从 v1.4.1 开始，程序生成的 Oxford 正文会放在明确标记的管理区域内。重复导入只会替换这个区域，不会删除你在区域外添加的个人笔记。旧版本页面第一次重新导入时会保留全部旧正文并新增安全管理区域，因此 Oxford 内容可能暂时出现两份；确认新内容后可手动删除旧的 Oxford 段落。
 
 安装包支持英文和简体中文安装界面、可选桌面快捷方式、开始菜单入口和正常卸载。卸载程序时不会自动删除你的 Notion 配置。
 
 这是个人开源项目，安装包目前没有商业代码签名。Windows 可能显示“未知发布者”；请确认文件来自上面的官方 GitHub 仓库，并可使用 Release 中的 `.sha256` 文件核对下载内容。
+
+## macOS Apple 芯片测试版（M1、M2、M3、M4）
+
+这是给 Apple 芯片（M1、M2、M3、M4）Mac 使用的私人测试包，目前由 GitHub Actions 生成，还不是正式公开 Release。普通用户不需要安装 Python：
+
+1. 在本项目的 GitHub Actions 构建页面下载 `Oxford-to-Notion-macOS-arm64`，并解压
+2. 打开其中的 `.dmg` 文件
+3. 把 `Oxford to Notion` 拖到“应用程序”文件夹
+4. 第一次启动时，在“应用程序”中右键 `Oxford to Notion`，选择“打开”
+5. 在 Mac 版设置中粘贴你的 Notion Token 和数据库链接
+6. 打开“最近导入”，等待片刻即可从 Notion 获取历史记录
+
+这个免费个人测试包目前未签名、未经过 Apple 公证，所以第一次需要使用“右键 → 打开”。Token 和数据库链接需要在 Mac 上单独填写，只保存在这台 Mac 上，不会通过 GitHub 或 Recent 同步。最近导入记录会通过 Notion 同步；网络不可用时，程序会继续显示本地缓存。
 
 ## 我为什么做这个
 
