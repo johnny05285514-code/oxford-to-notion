@@ -1,0 +1,4 @@
+-r requirements.txt
+PySide6-Essentials==6.11.1
+shiboken6==6.11.1
+pyinstaller==6.21.0
