@@ -38,16 +38,20 @@ This personal open-source build is not commercially code-signed, so Windows may 
 
 ## macOS Apple silicon test build (M1, M2, M3, and M4)
 
-This is a private test build for Apple silicon (M1, M2, M3, and M4) Macs. GitHub Actions creates it; it is not a final public Release yet. You do not need to install Python:
+This is a test build for Apple silicon (M1, M2, M3, and M4) Macs. GitHub Actions creates it; it is not a final Release yet. Artifacts in this public repository are not private files. You do not need to install Python:
 
 1. Download and unzip the `Oxford-to-Notion-macOS-arm64` artifact from this project's GitHub Actions run
 2. Open the included `.dmg`
 3. Drag `Oxford to Notion` into `Applications`
-4. For the first launch, right-click the app in Applications and choose `Open`
+4. In Applications, right-click the app and choose `Open`. If macOS blocks it, first verify that the download came from this repository, then go to `System Settings → Privacy & Security`, find this app's `Open Anyway` option, and confirm as prompted. Do not disable system-wide security protection
 5. Paste your Notion Token and database link into Settings on the Mac
 6. Open Recent and wait briefly for the Notion history refresh
 
-This free personal test build is unsigned and not notarized by Apple, so the first launch requires right-click → Open. The Token and database link must be entered separately on the Mac; they stay on that Mac and are never synchronized through GitHub or Recent. Recent imports are synced through Notion, while a local cache remains available during temporary network failures.
+This free personal test build is ad-hoc signed, without an Apple Developer ID signature or Apple notarization. Right-click → Open does not guarantee a successful first launch. Prompts vary across macOS versions; see [Apple's instructions for safely opening apps](https://support.apple.com/en-us/102445). The build's startup smoke test does not cover the quarantined first launch after a browser download; this still needs testing on a real Mac.
+
+The Token and database link must be entered separately on the Mac; they stay on that Mac and are never synchronized through GitHub or Recent. Recent imports are synced through Notion, while local history remains available during temporary network failures. If the local cache cannot be saved, the app displays a warning and keeps the current records visible, but they may not survive a restart.
+
+New and repeat imports store a full UTC timestamp in `Added Date` for cross-device ordering. Legacy date-only records remain readable, but their original time cannot be recovered; importing them again records a new precise timestamp.
 
 ## Why I built this
 

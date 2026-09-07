@@ -51,7 +51,7 @@ jobs:
         if: always()
         run: hdiutil detach "$PWD/work/macos/mounted" || true
 
-      - name: Upload private test artifact
+      - name: Upload test artifact
         uses: actions/upload-artifact@v4
         with:
           name: Oxford-to-Notion-macOS-arm64

@@ -50,6 +50,7 @@ def make_window(
     window = OxfordToNotionWindow(
         history_reader=lambda: list(history or []),
         history_adder=history_adder or (lambda *_args: list(history or [])),
+        history_replacer=lambda records: records,
         recent_sync_func=recent_sync_func,
         enable_recent_sync=enable_recent_sync,
         start_update_check=False,
@@ -614,4 +615,74 @@ def test_recent_sync_failure_notice_retranslates(monkeypatch):
     window.set_language("en")
 
     assert "cached history" in window.recent_sync_notice.text()
+    window.close()
+
+
+def test_stale_sync_cannot_overwrite_import_and_queues_one_refresh(monkeypatch):
+    old, new = item("old"), item("new")
+    snapshots = iter([[old], [new, old]])
+    _app, window, _saved = make_window(
+        monkeypatch, history=[old], history_adder=lambda *_: [new, old],
+        recent_sync_func=lambda: next(snapshots), enable_recent_sync=True,
+    )
+    writes = []
+    window.history_replacer = lambda records: writes.append(records) or records
+    window.finish_success(ImportResult(new.word, new.page_url, "https://example.com/new"))
+    window.start_recent_sync(force=True)
+    window.recent_sync_thread_pool.jobs[0].run()
+    assert window.current_history == [new, old]
+    assert writes == []
+    assert len(window.recent_sync_thread_pool.jobs) == 2
+    window.recent_sync_thread_pool.jobs[1].run()
+    assert writes == [[new, old]]
+    window.close()
+
+
+def test_cache_failure_shows_remote_records_and_specific_notice(monkeypatch):
+    fresh = [item("fresh")]
+    _app, window, _saved = make_window(
+        monkeypatch, recent_sync_func=lambda: fresh, enable_recent_sync=True,
+    )
+    def fail(_records):
+        raise OSError("disk full")
+    window.history_replacer = fail
+    window.recent_sync_thread_pool.jobs[0].run()
+    assert window.current_history == fresh
+    assert not window.recent_sync_notice.isHidden()
+    window.set_language("en")
+    assert "could not be saved" in window.recent_sync_notice.text()
+    window.show_recent_page()
+    assert window.current_history == fresh
+    window.close()
+
+
+def test_failed_stale_sync_also_schedules_followup(monkeypatch):
+    def fail():
+        raise RuntimeError("offline")
+    _app, window, _saved = make_window(
+        monkeypatch, history=[item("local")], recent_sync_func=fail,
+        enable_recent_sync=True,
+    )
+    window.start_recent_sync(force=True)
+    window.recent_sync_thread_pool.jobs[0].run()
+    assert len(window.recent_sync_thread_pool.jobs) == 2
+    assert window._recent_sync_running
+    window.recent_sync_thread_pool.jobs[1].run()
+    assert not window._recent_sync_running
+    assert not window.recent_sync_notice.isHidden()
+    assert window.current_history == [item("local")]
+    window.close()
+
+
+def test_import_stays_successful_when_local_cache_cannot_be_saved(monkeypatch):
+    def fail(*_args):
+        raise PermissionError("read only")
+    _app, window, _saved = make_window(
+        monkeypatch, history=[item("old")], history_adder=fail,
+    )
+    window.finish_success(ImportResult("new", "https://notion.so/new", "https://example.com/new"))
+    assert [record.word for record in window.current_history] == ["new", "old"]
+    assert window.current_page_url == "https://notion.so/new"
+    assert "未能保存" in window.recent_sync_notice.text()
+    assert window.word_entry.isEnabled()
     window.close()

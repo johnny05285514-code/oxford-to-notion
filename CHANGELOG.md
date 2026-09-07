@@ -4,13 +4,21 @@
 
 ### 简体中文
 
-- 新增 macOS ARM64 私人测试构建，支持 M1、M2、M3 和 M4 Mac。
+- 新增 macOS ARM64 测试构建，支持 M1、M2、M3 和 M4 Mac。
+- 修复旧 Recent 同步覆盖刚导入记录的问题；过时结果不再写入缓存，并补一次同步。
+- `Added Date` 改为 UTC 精确时间；旧日期记录保持兼容。
+- 缓存保存失败会明确提示并保留当前记录，不再假报同步成功。
+- 修正 Mac 首次打开说明，说明临时签名、安全设置和真实设备验证限制。
 - “最近导入”现在通过 Notion 在 Windows 和 Mac 之间同步，并在同步失败时保留本机缓存。
 - 重复导入会刷新 `Added Date`，同时继续保留用户在管理区域外添加的个人笔记。
 
 ### English
 
-- Added a private macOS ARM64 test build for M1, M2, M3, and M4 Macs.
+- Added a macOS ARM64 test build for M1, M2, M3, and M4 Macs.
+- Discard stale Recent results before cache writes and schedule a follow-up sync after imports.
+- Store precise UTC import timestamps while retaining compatibility with date-only records.
+- Report cache write failures without discarding the currently displayed history.
+- Clarify Mac first-launch security steps, ad-hoc signing, and real-device test limitations.
 - Recent imports now sync through Notion across Windows and Mac, with a local cache when synchronization fails.
 - Repeat imports refresh `Added Date` while continuing to preserve personal notes outside the managed section.
 

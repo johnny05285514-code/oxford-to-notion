@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Callable
+from datetime import datetime, timezone
 from time import monotonic
 
 from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
@@ -25,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from app_paths import resource_path
 from exceptions import AppError
-from history_store import ImportHistoryItem, add_history_item, read_history
+from history_store import ImportHistoryItem, add_history_item, read_history, replace_history_items
 from i18n import Translator, detect_system_language, localize_error
 from import_service import ImportResult, import_word
 from language_menu import LanguageMenuButton
@@ -377,6 +378,7 @@ class OxfordToNotionWindow(QMainWindow):
         import_func: Callable[[str], ImportResult] = import_word,
         history_reader: Callable[[], list[ImportHistoryItem]] = read_history,
         history_adder: Callable[[str, str, str], list[ImportHistoryItem]] = add_history_item,
+        history_replacer: Callable[[list[ImportHistoryItem]], list[ImportHistoryItem]] = replace_history_items,
         update_func: Callable[[], UpdateInfo | None] = check_for_update,
         start_update_check: bool = True,
         recent_sync_func: Callable[[], list[ImportHistoryItem]] = sync_recent_history,
@@ -387,6 +389,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.import_func = import_func
         self.history_reader = history_reader
         self.history_adder = history_adder
+        self.history_replacer = history_replacer
         self.update_func = update_func
         self.recent_sync_func = recent_sync_func
         self.enable_recent_sync = enable_recent_sync
@@ -398,6 +401,8 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_sync_thread_pool = QThreadPool(self)
         self.recent_sync_thread_pool.setMaxThreadCount(1)
         self._recent_sync_running = False
+        self._recent_sync_pending = False
+        self._recent_notice_key = "recent_sync_cached"
         self._last_recent_sync_attempt: float | None = None
         self.current_page_url = ""
         self.current_history: list[ImportHistoryItem] = []
@@ -773,7 +778,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_title_label.setText(text("recently_imported"))
         self.recent_subtitle_label.setText(text("recent_subtitle"))
         if not self.recent_sync_notice.isHidden():
-            self.recent_sync_notice.setText(text("recent_sync_cached"))
+            self.recent_sync_notice.setText(text(self._recent_notice_key))
         self.recent_search_entry.setPlaceholderText(text("recent_search_placeholder"))
         self.filter_recent_history(self.recent_search_entry.text())
         self.settings_title_label.setText(text("settings_title"))
@@ -829,7 +834,7 @@ class OxfordToNotionWindow(QMainWindow):
 
     @Slot()
     def show_recent_page(self) -> None:
-        self.refresh_history()
+        self.refresh_history(self.current_history)
         self.start_recent_sync()
         self.stack.setCurrentWidget(self.recent_page)
         self._set_active_nav(self.nav_recent_button)
@@ -905,7 +910,17 @@ class OxfordToNotionWindow(QMainWindow):
             self.set_status_key("import_success", "#15803d", success=True, word=result.word)
         self.open_spacing.show()
         self.open_button.show()
-        self.refresh_history(self.history_adder(result.word, result.page_url, result.oxford_url))
+        try:
+            items = self.history_adder(result.word, result.page_url, result.oxford_url)
+        except OSError:
+            newest = ImportHistoryItem(
+                result.word, result.page_url,
+                datetime.now(timezone.utc).isoformat(), result.oxford_url,
+            )
+            existing = [item for item in self.current_history if item.word != result.word]
+            items = [newest, *existing][:100]
+            self.show_recent_notice("recent_cache_failed")
+        self.refresh_history(items)
         self.start_recent_sync(force=True)
         self.word_entry.clear()
         self.word_entry.setFocus()
@@ -1007,7 +1022,10 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_layout.addStretch(1)
 
     def start_recent_sync(self, *, force: bool = False) -> None:
-        if not self.enable_recent_sync or self._recent_sync_running:
+        if not self.enable_recent_sync:
+            return
+        if self._recent_sync_running:
+            self._recent_sync_pending |= force
             return
         now = self.recent_sync_clock()
         if (
@@ -1026,13 +1044,30 @@ class OxfordToNotionWindow(QMainWindow):
     @Slot(object)
     def finish_recent_sync(self, items: list[ImportHistoryItem]) -> None:
         self._recent_sync_running = False
-        self.recent_sync_notice.hide()
+        if self._recent_sync_pending:
+            self._recent_sync_pending = False
+            self.start_recent_sync(force=True)
+            return
+        try:
+            self.history_replacer(items)
+        except OSError:
+            self.show_recent_notice("recent_cache_failed")
+        else:
+            self.recent_sync_notice.hide()
         self.refresh_history(items)
 
     @Slot(str)
     def fail_recent_sync(self, _message: str) -> None:
         self._recent_sync_running = False
-        self.recent_sync_notice.setText(self.translator.text("recent_sync_cached"))
+        if self._recent_sync_pending:
+            self._recent_sync_pending = False
+            self.start_recent_sync(force=True)
+            return
+        self.show_recent_notice("recent_sync_cached")
+
+    def show_recent_notice(self, key: str) -> None:
+        self._recent_notice_key = key
+        self.recent_sync_notice.setText(self.translator.text(key))
         self.recent_sync_notice.show()
 
     @Slot()
@@ -1132,7 +1167,7 @@ class OxfordToNotionWindow(QMainWindow):
             return
         self.history_link_target = selected_target
         self.performance_diagnostics_enabled = diagnostics_enabled
-        self.refresh_history()
+        self.refresh_history(self.current_history)
         self.show_main_page()
         self.set_status_key("settings_saved", "#15803d", success=True)
         self.start_recent_sync(force=True)

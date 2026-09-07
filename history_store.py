@@ -74,10 +74,10 @@ def _write_history_items(
     target: Path,
 ) -> list[ImportHistoryItem]:
     validated = _validated_items(items)
-    target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".tmp")
     payload = {"items": [asdict(item) for item in validated]}
     try:
+        target.parent.mkdir(parents=True, exist_ok=True)
         temporary.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -88,7 +88,7 @@ def _write_history_items(
             temporary.unlink(missing_ok=True)
         except OSError:
             pass
-        return read_history(target)
+        raise
     return validated
 
 

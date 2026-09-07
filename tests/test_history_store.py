@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+import pytest
 from datetime import datetime, timezone
 
 from history_store import (
@@ -10,6 +12,19 @@ from history_store import (
 
 
 NOW = datetime(2026, 7, 12, 1, 2, 3, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("operation", ["mkdir", "write_text", "replace"])
+def test_failed_cache_write_raises_and_preserves_old_file(tmp_path, monkeypatch, operation):
+    path = tmp_path / "history.json"
+    old = add_history_item("old", "https://notion.so/old", path=path)
+    def fail(*args, **kwargs):
+        raise PermissionError("cannot save")
+    monkeypatch.setattr(Path, operation, fail)
+    with pytest.raises(OSError):
+        replace_history_items([], path=path)
+    assert read_history(path) == old
+    assert not path.with_suffix(".tmp").exists()
 
 
 def test_missing_or_corrupt_history_is_empty(tmp_path):

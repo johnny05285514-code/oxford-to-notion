@@ -11,7 +11,8 @@ def test_chinese_readme_explains_macos_test_install_and_sync():
     assert "GitHub Actions" in content
     assert "拖到“应用程序”" in content
     assert "右键" in content and "打开" in content
-    assert "未签名" in content
+    assert "隐私与安全性" in content and "仍要打开" in content
+    assert "Developer ID" in content
     assert "Token 和数据库链接需要在 Mac 上单独填写" in content
     assert "通过 Notion 同步" in content
     assert "本地缓存" in content
@@ -24,7 +25,8 @@ def test_english_readme_explains_macos_test_install_and_sync():
     assert "GitHub Actions" in content
     assert "drag `oxford to notion` into `applications`" in content.lower()
     assert "right-click" in content and "Open" in content
-    assert "unsigned" in content
+    assert "Privacy & Security" in content and "Open Anyway" in content
+    assert "ad-hoc" in content
     assert "entered separately on the Mac" in content
     assert "synced through Notion" in content
     assert "local cache" in content

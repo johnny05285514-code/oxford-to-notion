@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pytest
 import httpx
@@ -65,6 +65,20 @@ def test_rich_text_splits_long_content():
     result = rich_text("x" * 4001)
 
     assert [len(item["text"]["content"]) for item in result] == [2000, 2000, 1]
+
+
+@pytest.mark.parametrize("existing", [[], [{"id": "existing-page"}]])
+def test_new_and_repeat_import_save_utc_time(existing):
+    client = FakeClient(existing)
+    client.blocks.children.responses["append"] = {"results": [{"id": "managed"}]}
+    before = datetime.now(timezone.utc)
+    NotionWriter(client, "database-id").upsert(ENTRY)
+    after = datetime.now(timezone.utc)
+    call = next(kwargs for name, kwargs in client.pages.calls
+                if name in {"create", "update"})
+    saved = datetime.fromisoformat(call["properties"]["Added Date"]["date"]["start"])
+    assert saved.utcoffset().total_seconds() == 0
+    assert before <= saved <= after
 
 
 def test_build_properties_maps_entry_summary():

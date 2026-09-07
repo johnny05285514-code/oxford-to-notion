@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from time import perf_counter
 from typing import Any
 from urllib.parse import urlparse
@@ -103,7 +103,7 @@ class NotionWriter:
         self,
         client: Any,
         database_id: str,
-        today: Callable[[], date] = date.today,
+        today: Callable[[], date] = lambda: datetime.now(timezone.utc),
         clock: Callable[[], float] = perf_counter,
     ) -> None:
         self.client = client

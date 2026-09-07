@@ -40,16 +40,20 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 
 ## macOS Apple 芯片测试版（M1、M2、M3、M4）
 
-这是给 Apple 芯片（M1、M2、M3、M4）Mac 使用的私人测试包，目前由 GitHub Actions 生成，还不是正式公开 Release。普通用户不需要安装 Python：
+这是给 Apple 芯片（M1、M2、M3、M4）Mac 使用的测试包，目前由 GitHub Actions 生成，还不是正式 Release。公开仓库中的构建产物不是私人文件。普通用户不需要安装 Python：
 
 1. 在本项目的 GitHub Actions 构建页面下载 `Oxford-to-Notion-macOS-arm64`，并解压
 2. 打开其中的 `.dmg` 文件
 3. 把 `Oxford to Notion` 拖到“应用程序”文件夹
-4. 第一次启动时，在“应用程序”中右键 `Oxford to Notion`，选择“打开”
+4. 在“应用程序”中右键 `Oxford to Notion`，选择“打开”。如果被系统拦截，请确认下载来自本仓库，再进入“系统设置 → 隐私与安全性”，找到此应用的“仍要打开”，按提示确认；不要关闭系统整体安全保护
 5. 在 Mac 版设置中粘贴你的 Notion Token 和数据库链接
 6. 打开“最近导入”，等待片刻即可从 Notion 获取历史记录
 
-这个免费个人测试包目前未签名、未经过 Apple 公证，所以第一次需要使用“右键 → 打开”。Token 和数据库链接需要在 Mac 上单独填写，只保存在这台 Mac 上，不会通过 GitHub 或 Recent 同步。最近导入记录会通过 Notion 同步；网络不可用时，程序会继续显示本地缓存。
+这个免费个人测试包使用临时签名（ad-hoc），没有 Apple Developer ID 签名，也未经过 Apple 公证；“右键 → 打开”不保证能直接启动。不同 macOS 版本的提示可能不同，详见 [Apple 的安全打开说明](https://support.apple.com/en-us/102445)。构建中的启动自检不等于验证了浏览器下载后、带隔离标记的首次打开流程，仍需在真实 Mac 上测试。
+
+Token 和数据库链接需要在 Mac 上单独填写，只保存在这台 Mac 上，不会通过 GitHub 或 Recent 同步。最近导入记录会通过 Notion 同步；网络不可用时，程序会继续显示本地记录。若本地缓存保存失败，界面会明确提示，当前显示的记录仍可使用，但重启后可能无法恢复。
+
+新导入和重复导入会将 `Added Date` 保存为包含时分秒的 UTC 时间，以便跨设备排序。旧的仅日期记录仍可读取，但无法恢复当时未保存的具体时间；重新导入后才会记录新的精确时间。
 
 ## 我为什么做这个
 
