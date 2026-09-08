@@ -32,9 +32,15 @@ if errorlevel 1 (
 
 set "SETUP_FILE=release\Oxford-to-Notion-Setup-1.5.1.exe"
 powershell -NoProfile -Command ^
-  "$file = Get-Item '%SETUP_FILE%'; " ^
-  "$hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower(); " ^
+  "$ErrorActionPreference = 'Stop'; $file = Get-Item '%SETUP_FILE%'; " ^
+  "$sha = [System.Security.Cryptography.SHA256]::Create(); $stream = [System.IO.File]::OpenRead($file.FullName); " ^
+  "try { $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() } finally { $stream.Dispose(); $sha.Dispose() }; " ^
   "Set-Content -Encoding ascii -Path ($file.FullName + '.sha256') -Value ($hash + '  ' + $file.Name)"
+if errorlevel 1 (
+    echo Installer checksum generation failed.
+    if /i not "%~1"=="--no-pause" pause
+    exit /b 1
+)
 
 echo.
 echo Installer build complete:

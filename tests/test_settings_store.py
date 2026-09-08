@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from dotenv import dotenv_values
@@ -13,7 +14,45 @@ from settings_store import (
     save_performance_diagnostics,
     save_history_link_target,
     save_notion_settings,
+    save_app_language,
 )
+
+
+@pytest.mark.parametrize("save,args", [
+    (save_notion_settings, ("new-token", "new-db")),
+    (save_app_language, ("en",)),
+    (save_history_link_target, ("oxford",)),
+    (save_performance_diagnostics, (True,)),
+])
+def test_locked_settings_raise_friendly_error_without_changing_file(tmp_path, save, args):
+    path = tmp_path / ".env"
+    original = "NOTION_TOKEN='original'\nNOTION_DATABASE_ID='original-db'\n"
+    path.write_text(original, encoding="utf-8")
+    with patch("settings_store.os.replace", side_effect=PermissionError("locked")):
+        with pytest.raises(ConfigurationError, match="Could not save settings"):
+            save(*args, env_path=path)
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_second_notion_key_failure_preserves_file_and_running_credentials(tmp_path, monkeypatch):
+    import settings_store
+    path = tmp_path / ".env"
+    original = "NOTION_TOKEN='old'\nNOTION_DATABASE_ID='old-db'\n"
+    path.write_text(original, encoding="utf-8")
+    monkeypatch.setenv("NOTION_TOKEN", "old")
+    monkeypatch.setenv("NOTION_DATABASE_ID", "old-db")
+    real_set_key = settings_store.set_key
+    def fail_second(filename, key, value):
+        if key == "NOTION_DATABASE_ID":
+            raise PermissionError("locked")
+        return real_set_key(filename, key, value)
+    monkeypatch.setattr(settings_store, "set_key", fail_second)
+    with pytest.raises(ConfigurationError):
+        save_notion_settings("new", "new-db", env_path=path)
+    assert path.read_text(encoding="utf-8") == original
+    assert settings_store.os.environ["NOTION_TOKEN"] == "old"
+    assert settings_store.os.environ["NOTION_DATABASE_ID"] == "old-db"
+    assert list(tmp_path.iterdir()) == [path]
 
 
 def test_save_and_read_notion_settings(tmp_path: Path):

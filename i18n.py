@@ -24,6 +24,7 @@ ENGLISH_MESSAGES = {
     "import_heading": "Build your vocabulary, one word at a time.",
     "recent_subtitle": "Your 100 most recent imports are synced through Notion and cached on this device.",
     "recent_sync_cached": "Sync is temporarily unavailable. Showing cached history.",
+    "error_settings_save": "Settings could not be saved. Check folder permissions and available disk space, then try again.",
     "recent_cache_failed": "History is shown, but could not be saved on this device. Check available disk space and folder permissions.",
     "recent_empty": "No imported words yet.",
     "recent_search_placeholder": "Search imported words",
@@ -122,6 +123,7 @@ CHINESE_MESSAGES = {
     "import_heading": "一次一个单词，建立你的词汇库。",
     "recent_subtitle": "最近导入的 100 个单词会通过 Notion 同步，并缓存在这台设备上。",
     "recent_sync_cached": "暂时无法同步，正在显示本机记录。",
+    "error_settings_save": "无法保存设置。请检查文件夹写入权限和剩余磁盘空间，然后重试。",
     "recent_cache_failed": "记录已显示，但未能保存到本机。请检查磁盘空间和文件夹权限。",
     "recent_empty": "还没有导入过单词。",
     "recent_search_placeholder": "搜索已导入的单词",
@@ -246,6 +248,8 @@ class Translator:
 def localize_error(message: str, translator: Translator) -> str:
     raw = message.strip()
     lowered = raw.lower()
+    if "could not save settings" in lowered:
+        return translator.text("error_settings_save")
 
     if "has no entry" in lowered or "no exact matches" in lowered:
         match = re.search(r"for ['\"]([^'\"]+)['\"]", raw, re.IGNORECASE)

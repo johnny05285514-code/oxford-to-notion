@@ -1,4 +1,5 @@
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,29 @@ HISTORY_LINK_TARGETS = {
     HISTORY_LINK_TARGET_OXFORD,
 }
 PERFORMANCE_DIAGNOSTICS_KEY = "PERFORMANCE_DIAGNOSTICS"
+
+
+def _save_values(path: Path, values: dict[str, str]) -> None:
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        original = path.read_text(encoding="utf-8") if path.exists() else ""
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, prefix=".settings-", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(original)
+        for key, value in values.items():
+            set_key(str(temporary), key, value)
+        os.replace(temporary, path)
+    except (OSError, UnicodeError) as exc:
+        raise ConfigurationError("Could not save settings. Check folder permissions and disk space.") from exc
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,11 +78,7 @@ def save_notion_settings(
         raise ConfigurationError("Missing required settings: " + ", ".join(missing))
 
     path = env_path or default_env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), "NOTION_TOKEN", token)
-    set_key(str(path), "NOTION_DATABASE_ID", database)
+    _save_values(path, {"NOTION_TOKEN": token, "NOTION_DATABASE_ID": database})
 
     # Keep the running GUI in sync without requiring a restart.
     os.environ["NOTION_TOKEN"] = token
@@ -77,10 +97,7 @@ def save_app_language(language: str, *, env_path: Path | None = None) -> None:
         raise ConfigurationError(f"Unsupported application language: {language}")
 
     path = env_path or default_env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), "APP_LANGUAGE", language)
+    _save_values(path, {"APP_LANGUAGE": language})
 
 
 def read_history_link_target(*, env_path: Path | None = None) -> str:
@@ -100,10 +117,7 @@ def save_history_link_target(
         raise ConfigurationError(f"Unsupported history link target: {target}")
 
     path = env_path or default_env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), "HISTORY_LINK_TARGET", normalized)
+    _save_values(path, {"HISTORY_LINK_TARGET": normalized})
 
 
 def read_performance_diagnostics(*, env_path: Path | None = None) -> bool:
@@ -119,7 +133,4 @@ def save_performance_diagnostics(
     env_path: Path | None = None,
 ) -> None:
     path = env_path or default_env_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        path.touch()
-    set_key(str(path), PERFORMANCE_DIAGNOSTICS_KEY, "1" if enabled else "0")
+    _save_values(path, {PERFORMANCE_DIAGNOSTICS_KEY: "1" if enabled else "0"})

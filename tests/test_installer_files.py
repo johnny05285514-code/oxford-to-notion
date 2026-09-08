@@ -31,6 +31,8 @@ def test_installer_build_script_builds_app_and_checksum():
     assert 'build_app.bat --no-pause' in script
     assert 'MAKENSIS' in script
     assert 'scoop\\apps\\nsis' in script
-    assert 'Get-FileHash' in script
+    assert '[System.Security.Cryptography.SHA256]::Create()' in script
+    assert "$ErrorActionPreference = 'Stop'" in script
+    assert 'Installer checksum generation failed.' in script
     assert '.sha256' in script
     assert '--no-pause' in script

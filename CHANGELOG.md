@@ -4,6 +4,9 @@
 
 ### 简体中文
 
+- Windows 排查：修复配置文件被占用或不可写时的未处理错误；Notion Token 和数据库地址整组保存，失败时保留原文件，并显示中英文提示。
+- 修复 Windows 安装包校验文件生成失败却报告构建成功的问题。
+
 - 新增 macOS ARM64 测试构建，支持 M1、M2、M3 和 M4 Mac。
 - 修复旧 Recent 同步覆盖刚导入记录的问题；过时结果不再写入缓存，并补一次同步。
 - `Added Date` 改为 UTC 精确时间；旧日期记录保持兼容。
@@ -13,6 +16,9 @@
 - 重复导入会刷新 `Added Date`，同时继续保留用户在管理区域外添加的个人笔记。
 
 ### English
+
+- Windows audit: handle locked or unwritable settings files; save Notion credentials together atomically, preserve the previous file on failure, and show localized errors.
+- Fix installer builds reporting success when checksum generation fails.
 
 - Added a macOS ARM64 test build for M1, M2, M3, and M4 Macs.
 - Discard stale Recent results before cache writes and schedule a follow-up sync after imports.
