@@ -28,6 +28,26 @@
 - Recent imports now sync through Notion across Windows and Mac, with a local cache when synchronization fails.
 - Repeat imports refresh `Added Date` while continuing to preserve personal notes outside the managed section.
 
+## v1.5.2 — 2026-09-08 (Windows)
+
+### 简体中文
+
+- 正式发布 Windows 修复包；Mac ARM64 仍为测试构建，不包含在本次正式安装包中。
+- 最近导入支持搜索及通过 Notion 同步；丢弃过时同步结果，避免覆盖刚导入的单词。
+- 新导入和重复导入记录精确 UTC 时间；旧日期记录保持兼容，但不能恢复过去未记录的时间。
+- 本地历史保存失败会提示并保留当前显示的记录。
+- 配置写入失败时保留原文件，Token 和数据库地址整组保存。
+- 修复安装包校验生成失败却报告成功的问题。安装更新保留个人配置和历史。
+
+### English
+
+- Windows maintenance release. Mac ARM64 remains a test build and is not included in this release.
+- Search and Notion-backed Recent sync; discard stale responses instead of overwriting newly imported words.
+- Store precise UTC timestamps for new and repeat imports; legacy date-only records remain readable.
+- Report local history write failures while preserving currently displayed records.
+- Preserve settings on write failure and save Notion credentials together.
+- Fail installer builds correctly when checksum generation fails. Updates preserve personal settings and history.
+
 ## v1.5.1 — 2026-08-01
 
 ### 简体中文
