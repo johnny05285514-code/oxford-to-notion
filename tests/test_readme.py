@@ -4,11 +4,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_chinese_readme_explains_macos_test_install_and_sync():
+def test_chinese_readme_explains_macos_release_install_and_sync():
     content = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "Apple 芯片（M1、M2、M3、M4）" in content
+    assert "macOS Apple 芯片版（M1、M2、M3、M4）" in content
     assert "GitHub Actions" in content
+    assert "GitHub Releases" in content
+    assert "M3 MacBook" in content
     assert "拖到“应用程序”" in content
     assert "右键" in content and "打开" in content
     assert "隐私与安全性" in content and "仍要打开" in content
@@ -18,11 +20,13 @@ def test_chinese_readme_explains_macos_test_install_and_sync():
     assert "本地缓存" in content
 
 
-def test_english_readme_explains_macos_test_install_and_sync():
+def test_english_readme_explains_macos_release_install_and_sync():
     content = (ROOT / "README.en.md").read_text(encoding="utf-8")
 
     assert "Apple silicon (M1, M2, M3, and M4)" in content
     assert "GitHub Actions" in content
+    assert "GitHub Releases" in content
+    assert "M3 MacBook" in content
     assert "drag `oxford to notion` into `applications`" in content.lower()
     assert "right-click" in content and "Open" in content
     assert "Privacy & Security" in content and "Open Anyway" in content

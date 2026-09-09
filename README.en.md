@@ -36,18 +36,18 @@ The installer supports English and Simplified Chinese, an optional desktop short
 
 This personal open-source build is not commercially code-signed, so Windows may show an “Unknown publisher” warning. Confirm that the file came from the official GitHub repository above and optionally verify it with the `.sha256` file included in the Release.
 
-## macOS Apple silicon test build (M1, M2, M3, and M4)
+## macOS Apple silicon (M1, M2, M3, and M4)
 
-This is a test build for Apple silicon (M1, M2, M3, and M4) Macs. GitHub Actions creates it; it is not a final Release yet. Artifacts in this public repository are not private files. You do not need to install Python:
+The macOS ARM64 build is now included in the official GitHub Release. GitHub Actions builds it automatically, and it has been tested in real use on an M3 MacBook. You do not need to install Python:
 
-1. Download and unzip the `Oxford-to-Notion-macOS-arm64` artifact from this project's GitHub Actions run
+1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest) and download `Oxford-to-Notion-macOS-arm64.dmg`
 2. Open the included `.dmg`
 3. Drag `Oxford to Notion` into `Applications`
 4. In Applications, right-click the app and choose `Open`. If macOS blocks it, first verify that the download came from this repository, then go to `System Settings → Privacy & Security`, find this app's `Open Anyway` option, and confirm as prompted. Do not disable system-wide security protection
 5. Paste your Notion Token and database link into Settings on the Mac
 6. Open Recent and wait briefly for the Notion history refresh
 
-This free personal test build is ad-hoc signed, without an Apple Developer ID signature or Apple notarization. Right-click → Open does not guarantee a successful first launch. Prompts vary across macOS versions; see [Apple's instructions for safely opening apps](https://support.apple.com/en-us/102445). The build's startup smoke test does not cover the quarantined first launch after a browser download; this still needs testing on a real Mac.
+This free personal build is ad-hoc signed, without an Apple Developer ID signature or Apple notarization. Right-click → Open does not guarantee a successful first launch. Prompts vary across macOS versions; see [Apple's instructions for safely opening apps](https://support.apple.com/en-us/102445). The automated build verifies the ARM64 architecture, DMG mounting, and app startup. Real-use testing passed on an M3 MacBook, but other Mac models and macOS versions may still differ.
 
 The Token and database link must be entered separately on the Mac; they stay on that Mac and are never synchronized through GitHub or Recent. Recent imports are synced through Notion, while local history remains available during temporary network failures. If the local cache cannot be saved, the app displays a warning and keeps the current records visible, but they may not survive a restart.
 

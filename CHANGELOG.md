@@ -7,7 +7,7 @@
 - Windows 排查：修复配置文件被占用或不可写时的未处理错误；Notion Token 和数据库地址整组保存，失败时保留原文件，并显示中英文提示。
 - 修复 Windows 安装包校验文件生成失败却报告构建成功的问题。
 
-- 新增 macOS ARM64 测试构建，支持 M1、M2、M3 和 M4 Mac。
+- 正式发布 macOS ARM64 版，支持 M1、M2、M3 和 M4 Mac，并已通过 M3 MacBook 实机测试。
 - 修复旧 Recent 同步覆盖刚导入记录的问题；过时结果不再写入缓存，并补一次同步。
 - `Added Date` 改为 UTC 精确时间；旧日期记录保持兼容。
 - 缓存保存失败会明确提示并保留当前记录，不再假报同步成功。
@@ -20,7 +20,7 @@
 - Windows audit: handle locked or unwritable settings files; save Notion credentials together atomically, preserve the previous file on failure, and show localized errors.
 - Fix installer builds reporting success when checksum generation fails.
 
-- Added a macOS ARM64 test build for M1, M2, M3, and M4 Macs.
+- Officially released the macOS ARM64 build for M1, M2, M3, and M4 Macs after real-device testing on an M3 MacBook.
 - Discard stale Recent results before cache writes and schedule a follow-up sync after imports.
 - Store precise UTC import timestamps while retaining compatibility with date-only records.
 - Report cache write failures without discarding the currently displayed history.
@@ -28,11 +28,11 @@
 - Recent imports now sync through Notion across Windows and Mac, with a local cache when synchronization fails.
 - Repeat imports refresh `Added Date` while continuing to preserve personal notes outside the managed section.
 
-## v1.5.2 — 2026-09-08 (Windows)
+## v1.5.2 — 2026-09-08 (Windows and macOS)
 
 ### 简体中文
 
-- 正式发布 Windows 修复包；Mac ARM64 仍为测试构建，不包含在本次正式安装包中。
+- 正式发布 Windows 安装包和 macOS Apple 芯片 DMG；Mac 版已通过 M3 实机测试。
 - 最近导入支持搜索及通过 Notion 同步；丢弃过时同步结果，避免覆盖刚导入的单词。
 - 新导入和重复导入记录精确 UTC 时间；旧日期记录保持兼容，但不能恢复过去未记录的时间。
 - 本地历史保存失败会提示并保留当前显示的记录。
@@ -41,7 +41,7 @@
 
 ### English
 
-- Windows maintenance release. Mac ARM64 remains a test build and is not included in this release.
+- Windows maintenance release plus the official macOS Apple silicon DMG, tested on an M3 MacBook.
 - Search and Notion-backed Recent sync; discard stale responses instead of overwriting newly imported words.
 - Store precise UTC timestamps for new and repeat imports; legacy date-only records remain readable.
 - Report local history write failures while preserving currently displayed records.
