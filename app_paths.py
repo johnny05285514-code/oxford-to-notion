@@ -26,6 +26,13 @@ def update_state_path() -> Path:
     return app_directory() / "update-state.json"
 
 
+def updates_directory() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Caches" / "Oxford to Notion" / "Updates"
+    base = os.getenv("LOCALAPPDATA")
+    return (Path(base) if base else Path.home() / "AppData" / "Local") / "Oxford to Notion" / "Updates"
+
+
 def resource_path(relative_path: str) -> Path:
     """Locate bundled read-only assets in source and PyInstaller builds."""
     if getattr(sys, "frozen", False):
