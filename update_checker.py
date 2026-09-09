@@ -8,14 +8,14 @@ from urllib.parse import urlparse
 import requests
 
 from app_paths import update_state_path as default_update_state_path
+from app_version import CURRENT_VERSION
 
 
-CURRENT_VERSION = "1.5.2"
 RELEASES_API_URL = (
     "https://api.github.com/repos/johnny05285514-code/oxford-to-notion/releases/latest"
 )
 CHECK_INTERVAL = timedelta(hours=24)
-USER_AGENT = "Oxford-to-Notion/1.5.2 (+personal low-frequency learning use)"
+USER_AGENT = f"Oxford-to-Notion/{CURRENT_VERSION} (+personal low-frequency learning use)"
 
 
 @dataclass(frozen=True, slots=True)

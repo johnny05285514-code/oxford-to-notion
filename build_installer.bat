@@ -21,8 +21,12 @@ if not defined MAKENSIS (
 call build_app.bat --no-pause
 if errorlevel 1 exit /b 1
 
+".venv\Scripts\python.exe" app_version.py > work\app-version.txt
+if errorlevel 1 exit /b 1
+set /p APP_VERSION=<work\app-version.txt
+if not defined APP_VERSION exit /b 1
 if not exist "release" mkdir "release"
-"%MAKENSIS%" /V2 installer.nsi
+"%MAKENSIS%" /V2 /DAPP_VERSION=%APP_VERSION% installer.nsi
 if errorlevel 1 (
     echo.
     echo Installer build failed.
@@ -30,7 +34,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "SETUP_FILE=release\Oxford-to-Notion-Setup-1.5.2.exe"
+set "SETUP_FILE=release\Oxford-to-Notion-Setup-%APP_VERSION%.exe"
 powershell -NoProfile -Command ^
   "$ErrorActionPreference = 'Stop'; $file = Get-Item '%SETUP_FILE%'; " ^
   "$sha = [System.Security.Cryptography.SHA256]::Create(); $stream = [System.IO.File]::OpenRead($file.FullName); " ^

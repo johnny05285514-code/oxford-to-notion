@@ -32,9 +32,11 @@ python -m PyInstaller \
   --windowed \
   --icon "$ICNS_PATH" \
   --add-data "assets/app-icon.png:assets" \
+  --add-data "version.json:." \
   --name "Oxford to Notion" \
   gui.py
 
+python scripts/package_version.py macos "$APP_PATH/Contents/Info.plist"
 "$APP_EXECUTABLE" --smoke-test
 codesign --force --deep --sign - "$APP_PATH"
 codesign --verify --deep --strict "$APP_PATH"

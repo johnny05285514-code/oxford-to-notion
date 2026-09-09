@@ -14,6 +14,9 @@ if not exist ".venv\Scripts\python.exe" (
 rem Keep unrelated tools on the parent PATH from supplying incompatible DLLs.
 set "PATH=%SystemRoot%\System32;%SystemRoot%;%~dp0.venv\Scripts"
 
+".venv\Scripts\python.exe" scripts\package_version.py windows work\windows-version.txt
+if errorlevel 1 exit /b 1
+
 ".venv\Scripts\python.exe" -m PyInstaller ^
     --noconfirm ^
     --clean ^
@@ -21,6 +24,8 @@ set "PATH=%SystemRoot%\System32;%SystemRoot%;%~dp0.venv\Scripts"
     --windowed ^
     --icon "assets\app-icon.ico" ^
     --add-data "assets\app-icon.png;assets" ^
+    --add-data "version.json;." ^
+    --version-file "work\windows-version.txt" ^
     --name "Oxford to Notion" ^
     gui.py
 

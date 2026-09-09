@@ -4,7 +4,9 @@ Unicode True
 !include "Sections.nsh"
 
 !define APP_NAME "Oxford to Notion"
-!define APP_VERSION "1.5.2"
+!ifndef APP_VERSION
+!error "APP_VERSION must be supplied by build_installer.bat"
+!endif
 !define APP_PUBLISHER "johnny05285514-code"
 !define APP_EXE "Oxford to Notion.exe"
 !define APP_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OxfordToNotion"
@@ -21,7 +23,7 @@ ShowInstDetails show
 ShowUninstDetails show
 BrandingText "Oxford to Notion"
 
-VIProductVersion "1.5.2.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
@@ -66,12 +68,13 @@ Section "Oxford to Notion (required)" SecMain
     File "dist\${APP_EXE}"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.8.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.5.0.ico"
-    File /oname=Oxford-to-Notion-v1.5.1.ico "assets\app-icon.ico"
+    Delete "$INSTDIR\Oxford-to-Notion-v1.5.1.ico"
+    File /oname=app-icon.ico "assets\app-icon.ico"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-    CreateShortcut "$SMPROGRAMS\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\Oxford-to-Notion-v1.5.1.ico" 0
+    CreateShortcut "$SMPROGRAMS\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app-icon.ico" 0
     IfFileExists "$DESKTOP\Oxford to Notion.lnk" 0 +2
-    CreateShortcut "$DESKTOP\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\Oxford-to-Notion-v1.5.1.ico" 0
+    CreateShortcut "$DESKTOP\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app-icon.ico" 0
 
     WriteRegStr HKCU "${APP_REG_KEY}" "DisplayName" "${APP_NAME}"
     WriteRegStr HKCU "${APP_REG_KEY}" "DisplayVersion" "${APP_VERSION}"
@@ -85,10 +88,11 @@ Section "Oxford to Notion (required)" SecMain
 SectionEnd
 
 Section /o "Desktop shortcut" SecDesktop
-    CreateShortcut "$DESKTOP\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\Oxford-to-Notion-v1.5.1.ico" 0
+    CreateShortcut "$DESKTOP\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app-icon.ico" 0
 SectionEnd
 
 Section "Uninstall"
+    Delete "$INSTDIR\app-icon.ico"
     Delete "$INSTDIR\${APP_EXE}"
     Delete "$INSTDIR\Oxford-to-Notion-v1.3.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.ico"

@@ -11,8 +11,8 @@ def test_nsis_installer_is_per_user_and_has_uninstall_support():
     assert '$\\"$INSTDIR\\Uninstall.exe$\\"' in script
     assert '$SMPROGRAMS\\Oxford to Notion.lnk' in script
     assert '$DESKTOP\\Oxford to Notion.lnk' in script
-    assert 'File /oname=Oxford-to-Notion-v1.5.1.ico "assets\\app-icon.ico"' in script
-    assert '"$INSTDIR\\Oxford-to-Notion-v1.5.1.ico" 0' in script
+    assert 'File /oname=app-icon.ico "assets\\app-icon.ico"' in script
+    assert '"$INSTDIR\\app-icon.ico" 0' in script
     assert 'Delete "$INSTDIR\\Oxford-to-Notion-v1.5.0.ico"' in script
 
 
