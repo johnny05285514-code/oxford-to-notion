@@ -1,9 +1,14 @@
 import sys
+import os
+import ctypes
+import subprocess
+from pathlib import Path
+from threading import Event
 from collections.abc import Callable
 from datetime import datetime, timezone
 from time import monotonic
 
-from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, QPointF, QRunnable, QSize, QThreadPool, QTimer, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -16,6 +21,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QProgressBar,
     QScrollArea,
     QStyle,
     QStyleOptionButton,
@@ -24,7 +30,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app_paths import resource_path
+from app_paths import resource_path, updates_directory
+from app_version import CURRENT_VERSION
 from exceptions import AppError
 from history_store import ImportHistoryItem, add_history_item, read_history, replace_history_items
 from i18n import Translator, detect_system_language, localize_error
@@ -45,7 +52,8 @@ from settings_store import (
     save_performance_diagnostics,
 )
 from setup_wizard import ConnectionWorker, SetupWizard
-from update_checker import UpdateInfo, check_for_update
+from update_checker import UpdateInfo, check_for_update, valid_download_info
+from update_downloader import download_update, cleanup_partial_downloads, UpdateDownloadError
 
 
 SUMMARY_HISTORY_ITEMS = 5
@@ -327,6 +335,8 @@ class ImportWorker(QRunnable):
 
 class UpdateSignals(QObject):
     completed = Signal(object)
+    failed = Signal(str)
+    progress = Signal(int, int)
 
 
 class UpdateWorker(QRunnable):
@@ -340,11 +350,54 @@ class UpdateWorker(QRunnable):
         try:
             result = self.update_func()
         except Exception:
-            result = None
+            self.signals.failed.emit("check")
+            return
         try:
             self.signals.completed.emit(result)
         except RuntimeError:
             pass
+
+
+class DownloadWorker(QRunnable):
+    def __init__(self, info, download_func, cancel: Event):
+        super().__init__()
+        self.info, self.download_func, self.cancel = info, download_func, cancel
+        self.signals = UpdateSignals()
+
+    @Slot()
+    def run(self):
+        try:
+            result = self.download_func(self.info, progress=self.signals.progress.emit,
+                                        cancelled=self.cancel.is_set)
+        except UpdateDownloadError as exc:
+            self.signals.failed.emit(exc.code)
+        except Exception:
+            self.signals.failed.emit("network")
+        else:
+            self.signals.completed.emit(result)
+
+
+def launch_update_package(path: Path) -> None:
+    if not path.is_file():
+        raise OSError("Installer is missing")
+    environment = dict(os.environ)
+    environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    for key in ('QT_QPA_PLATFORM_PLUGIN_PATH', 'QT_PLUGIN_PATH', 'NOTION_TOKEN', 'NOTION_DATABASE_ID'):
+        environment.pop(key, None)
+    if sys.platform == "win32" and path.suffix == ".exe":
+        frozen = getattr(sys, 'frozen', False)
+        if frozen:
+            ctypes.windll.kernel32.SetDllDirectoryW(None)
+        try:
+            subprocess.Popen([str(path)], cwd=str(path.parent), shell=False,
+                             env=environment, close_fds=True)
+        finally:
+            if frozen:
+                ctypes.windll.kernel32.SetDllDirectoryW(sys._MEIPASS)
+    elif sys.platform == "darwin" and path.suffix == ".dmg":
+        subprocess.run(["/usr/bin/open", str(path)], check=True, timeout=10, env=environment)
+    else:
+        raise OSError("Unsupported installer")
 
 
 RECENT_SYNC_INTERVAL_SECONDS = 60.0
@@ -380,6 +433,8 @@ class OxfordToNotionWindow(QMainWindow):
         history_adder: Callable[[str, str, str], list[ImportHistoryItem]] = add_history_item,
         history_replacer: Callable[[list[ImportHistoryItem]], list[ImportHistoryItem]] = replace_history_items,
         update_func: Callable[[], UpdateInfo | None] = check_for_update,
+        download_func=download_update,
+        launch_update_func=launch_update_package,
         start_update_check: bool = True,
         recent_sync_func: Callable[[], list[ImportHistoryItem]] = sync_recent_history,
         enable_recent_sync: bool = False,
@@ -391,6 +446,18 @@ class OxfordToNotionWindow(QMainWindow):
         self.history_adder = history_adder
         self.history_replacer = history_replacer
         self.update_func = update_func
+        self.download_func = download_func
+        self.launch_update_func = launch_update_func
+        self.update_state = "idle"
+        self.update_progress = 0
+        self.update_error_code = ""
+        self.downloaded_update_path: Path | None = None
+        self._download_cancel = Event()
+        self._update_running = False
+        self._download_running = False
+        self._close_pending = False
+        self._import_busy = False
+        self._mac_installer_opened = False
         self.recent_sync_func = recent_sync_func
         self.enable_recent_sync = enable_recent_sync
         self.recent_sync_clock = recent_sync_clock
@@ -459,13 +526,14 @@ class OxfordToNotionWindow(QMainWindow):
         self.stack.addWidget(self.wizard_page)
         self.retranslate_ui()
         self.refresh_history()
-        self.show_update(None)
+        self.render_update_state()
         if stored.is_complete:
             self.show_main_page()
             self.start_recent_sync(force=True)
         else:
             self.show_wizard_page()
         if start_update_check:
+            cleanup_partial_downloads(updates_directory())
             self.start_update_check()
 
     def _build_sidebar(self) -> QFrame:
@@ -582,7 +650,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.update_label = QLabel(objectName="updateText")
         self.update_label.setWordWrap(True)
         self.update_button = QPushButton(objectName="updateAction")
-        self.update_button.clicked.connect(self.open_update_page)
+        self.update_button.clicked.connect(self.handle_update_action)
         update_layout.addWidget(self.update_label, 1)
         update_layout.addWidget(self.update_button)
         self.update_spacing = QWidget()
@@ -735,6 +803,36 @@ class OxfordToNotionWindow(QMainWindow):
         help_layout.addWidget(self.wizard_button, 0, Qt.AlignmentFlag.AlignLeft)
         layout.addSpacing(12)
         layout.addWidget(help_group)
+        about_group, about = self._settings_group()
+        self.about_heading = QLabel(objectName="sectionTitle")
+        about.addWidget(self.about_heading)
+        about.addWidget(QLabel("Oxford to Notion"))
+        self.version_label = QLabel()
+        about.addWidget(self.version_label)
+        self.check_update_button = QPushButton(objectName="secondary")
+        self.check_update_button.clicked.connect(lambda: self.start_update_check(force=True))
+        about.addWidget(self.check_update_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.update_status_label = QLabel(objectName="muted")
+        self.update_status_label.setWordWrap(True)
+        about.addWidget(self.update_status_label)
+        self.update_progress_bar = QProgressBar()
+        self.update_progress_bar.setRange(0, 100)
+        self.update_progress_bar.setStyleSheet("QProgressBar { border: 1px solid #e0e5ec; border-radius: 5px; text-align: center; } QProgressBar::chunk { background: #1769e8; border-radius: 4px; }")
+        about.addWidget(self.update_progress_bar)
+        self.settings_update_button = QPushButton(objectName="primary")
+        self.settings_update_button.clicked.connect(self.handle_update_action)
+        about.addWidget(self.settings_update_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.release_page_button = QPushButton(objectName="secondary")
+        self.release_page_button.clicked.connect(self.open_update_page)
+        about.addWidget(self.release_page_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.download_folder_button = QPushButton(objectName="secondary")
+        self.download_folder_button.clicked.connect(self.open_update_folder)
+        about.addWidget(self.download_folder_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.update_help_label = QLabel(objectName="muted")
+        self.update_help_label.setWordWrap(True)
+        about.addWidget(self.update_help_label)
+        layout.addSpacing(12)
+        layout.addWidget(about_group)
         layout.addStretch(1)
         actions = QHBoxLayout()
         actions.addStretch(1)
@@ -798,7 +896,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.settings_back_button.setText(text("cancel"))
         self.settings_test_button.setText(text("test_connection"))
         self.settings_save_button.setText(text("save_settings"))
-        self.update_button.setText(text("view_update"))
+        self.render_update_state()
         tooltip = text("language_tooltip")
         self.language_button.set_language_state(self.language, tooltip)
         for button in [*self.history_buttons, *self.recent_buttons]:
@@ -887,8 +985,7 @@ class OxfordToNotionWindow(QMainWindow):
         self.current_page_url = ""
         self.open_button.hide()
         self.open_spacing.hide()
-        self.word_entry.setEnabled(False)
-        self.import_button.setEnabled(False)
+        self.set_busy(True)
         self.import_button.setText(self.translator.text("importing"))
         self.set_status_key("querying", "#64748b", word=word)
         worker = ImportWorker(word, self.import_func)
@@ -932,9 +1029,14 @@ class OxfordToNotionWindow(QMainWindow):
         self.word_entry.setFocus()
 
     def set_ready(self) -> None:
-        self.word_entry.setEnabled(True)
-        self.import_button.setEnabled(True)
+        self.set_busy(False)
         self.import_button.setText(self.translator.text("import"))
+
+    def set_busy(self, busy: bool) -> None:
+        self._import_busy = busy
+        self.word_entry.setEnabled(not busy)
+        self.import_button.setEnabled(not busy)
+        self.render_update_state()
 
     def set_status_key(self, key: str, color: str, *, success: bool = False, **values: object) -> None:
         self._status_key = key
@@ -1070,23 +1172,153 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_sync_notice.setText(self.translator.text(key))
         self.recent_sync_notice.show()
 
-    @Slot()
-    def start_update_check(self) -> None:
-        worker = UpdateWorker(self.update_func)
+    def start_update_check(self, force: bool = False) -> None:
+        if self._update_running or self._download_running:
+            return
+        self._update_running = True
+        self.update_state = "checking"
+        self.render_update_state()
+        worker = UpdateWorker(lambda: self.update_func(force=True) if force else self.update_func())
         worker.signals.completed.connect(self.show_update)
+        worker.signals.failed.connect(self.fail_update)
         self.update_thread_pool.start(worker)
 
     @Slot(object)
     def show_update(self, info: UpdateInfo | None) -> None:
+        self._update_running = False
+        if info != self.update_info:
+            self.downloaded_update_path = None
+            self._mac_installer_opened = False
         self.update_info = info
-        if info is None:
-            self.update_spacing.hide()
-            self.update_banner.hide()
+        self.update_state = "verified" if self.downloaded_update_path else "available" if info else "current"
+        self.render_update_state()
+        self._resume_pending_close()
+
+    def render_update_state(self) -> None:
+        text = self.translator.text
+        state = self.update_state
+        self.about_heading.setText(text("about_updates"))
+        self.version_label.setText(text("current_version", version=CURRENT_VERSION))
+        self.check_update_button.setText(text("check_updates"))
+        self.check_update_button.setEnabled(not (self._update_running or self._download_running))
+        self.release_page_button.setText(text("view_update"))
+        self.release_page_button.setVisible(self.update_info is not None)
+        self.download_folder_button.setText(text("open_download_folder"))
+        self.download_folder_button.setVisible(self.downloaded_update_path is not None)
+        self.update_progress_bar.setVisible(state == "downloading")
+        self.update_progress_bar.setValue(self.update_progress)
+        key = "update_"+state
+        values = {}
+        if state == "available":
+            key, values = "update_available", {"version": self.update_info.version}
+        elif state == "downloading":
+            values = {"percent": self.update_progress}
+        elif state == "error":
+            key = "update_error_"+self.update_error_code
+        if self.downloaded_update_path and self._import_busy:
+            key, values = "update_wait_import", {}
+        self.update_status_label.setText(text(key, **values))
+        action = "view_update"
+        if self.downloaded_update_path:
+            action = "install_update" if sys.platform == "win32" else "open_installer"
+        elif self.update_info and valid_download_info(self.update_info):
+            action = "retry_update" if state == "error" else "download_update"
+        elif state == "error" and not self.update_info:
+            action = "retry_update"
+        for button in (self.settings_update_button, self.update_button):
+            button.setText(text(action))
+            button.setEnabled(not (self._update_running or self._download_running or
+                                    (self.downloaded_update_path and self._import_busy)))
+        self.settings_update_button.setVisible(self.update_info is not None or state == "error")
+        self.update_spacing.setVisible(self.update_info is not None)
+        self.update_banner.setVisible(self.update_info is not None)
+        if self.update_info:
+            self.update_label.setText(text("update_available", version=self.update_info.version))
+        self.update_help_label.setVisible(self.downloaded_update_path is not None)
+        help_text = text("update_signing_note")
+        if sys.platform == "darwin":
+            help_text = text("update_mac_replace") + "\n\n" + help_text
+        self.update_help_label.setText(help_text)
+
+    def handle_update_action(self) -> None:
+        if self._update_running or self._download_running:
             return
-        self.update_label.setText(self.translator.text("update_available", version=info.version))
-        self.update_button.setText(self.translator.text("view_update"))
-        self.update_spacing.show()
-        self.update_banner.show()
+        if self.downloaded_update_path:
+            self.install_downloaded_update()
+        elif self.update_error_code == "check" and self.update_state == "error":
+            self.start_update_check(force=True)
+        elif self.update_info and valid_download_info(self.update_info):
+            self.start_update_download()
+        else:
+            self.open_update_page()
+
+    def start_update_download(self) -> None:
+        if self._download_running or self._update_running or not self.update_info:
+            return
+        if not valid_download_info(self.update_info):
+            self.open_update_page()
+            return
+        self._download_cancel.clear()
+        self._download_running = True
+        self.update_state, self.update_progress = "downloading", 0
+        self.render_update_state()
+        worker = DownloadWorker(self.update_info, self.download_func, self._download_cancel)
+        worker.signals.progress.connect(self.show_update_progress)
+        worker.signals.completed.connect(self.finish_update_download)
+        worker.signals.failed.connect(self.fail_update)
+        self.update_thread_pool.start(worker)
+
+    @Slot(int, int)
+    def show_update_progress(self, received: int, total: int) -> None:
+        self.update_progress = min(100, received * 100 // max(1, total))
+        self.render_update_state()
+
+    @Slot(object)
+    def finish_update_download(self, path: Path) -> None:
+        self._download_running = False
+        self.downloaded_update_path = Path(path)
+        self.update_state = "verified"
+        self.render_update_state()
+        self._resume_pending_close()
+
+    @Slot(str)
+    def fail_update(self, code: str) -> None:
+        self._update_running = self._download_running = False
+        self.update_state = "error"
+        self.update_error_code = code if code in {"check", "network", "integrity", "size", "storage", "cancelled", "launch"} else "network"
+        self.render_update_state()
+        self._resume_pending_close()
+
+    def install_downloaded_update(self) -> None:
+        if not self.downloaded_update_path or self._import_busy:
+            return
+        try:
+            self.launch_update_func(self.downloaded_update_path)
+        except (OSError, subprocess.SubprocessError):
+            self.fail_update("launch")
+            return
+        if sys.platform == "win32":
+            QApplication.quit()
+        else:
+            self._mac_installer_opened = True
+            self.update_state = "verified"
+            self.render_update_state()
+
+    def open_update_folder(self) -> None:
+        if self.downloaded_update_path:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.downloaded_update_path.parent)))
+
+    def closeEvent(self, event) -> None:
+        if self._update_running or self._download_running:
+            self._close_pending = True
+            self._download_cancel.set()
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def _resume_pending_close(self) -> None:
+        if self._close_pending:
+            QTimer.singleShot(0, self.close)
 
     @Slot()
     def open_update_page(self) -> None:
@@ -1175,6 +1407,10 @@ class OxfordToNotionWindow(QMainWindow):
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv if argv is None else argv)
+    if "--expected-version" in args:
+        index = args.index("--expected-version")
+        if index + 1 == len(args) or args[index + 1] != CURRENT_VERSION:
+            return 2
     app = QApplication.instance() or QApplication(args)
     app.setApplicationName("Oxford to Notion")
     app.setFont(build_ui_font())
