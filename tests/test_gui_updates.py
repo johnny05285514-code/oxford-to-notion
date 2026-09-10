@@ -48,6 +48,16 @@ def test_settings_version_and_manual_offline_check(window):
     assert window.check_update_button.isEnabled()
 
 
+def test_background_offline_check_stays_unobtrusive(window):
+    def offline():
+        raise UpdateCheckError()
+    window.update_func = offline
+    window.start_update_check()
+    window.update_thread_pool.jobs[-1].run()
+    assert window.update_state == 'idle'
+    assert window.update_banner.isHidden()
+
+
 def test_download_is_click_only_and_shared_with_banner(window, tmp_path, monkeypatch):
     monkeypatch.setattr(gui.sys, 'platform', 'win32')
     window.show_update(info())

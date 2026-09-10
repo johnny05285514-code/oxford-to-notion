@@ -1183,8 +1183,18 @@ class OxfordToNotionWindow(QMainWindow):
         self.render_update_state()
         worker = UpdateWorker(lambda: self.update_func(force=True) if force else self.update_func())
         worker.signals.completed.connect(self.show_update)
-        worker.signals.failed.connect(self.fail_update)
+        worker.signals.failed.connect(
+            self.fail_update if force else self.finish_background_update_failure
+        )
         self.update_thread_pool.start(worker)
+
+    @Slot(str)
+    def finish_background_update_failure(self, _code: str) -> None:
+        self._update_running = False
+        self.update_state = "idle"
+        self.update_error_code = ""
+        self.render_update_state()
+        self._resume_pending_close()
 
     @Slot(object)
     def show_update(self, info: UpdateInfo | None) -> None:
