@@ -110,6 +110,7 @@ def test_language_switch_preserves_size_and_translates_updates(window):
     app.processEvents()
     assert window.size() == size
     assert '当前版本' in window.version_label.text()
+    assert window.toolbar_title.text() == '设置'
     assert window.settings_update_button.text() == '下载更新'
     window.settings_scroll.ensureWidgetVisible(window.version_label)
     app.processEvents()
@@ -157,3 +158,27 @@ def test_frozen_windows_launch_resets_environment_and_restores_dll_path(monkeypa
     with pytest.raises(OSError):
         gui.launch_update_package(path)
     assert events == [('dll', None), ('launch', [str(path)]), ('dll', str(tmp_path/'bundle'))]
+
+
+def test_real_worker_close_cancels_without_destroying_running_pool(window):
+    from PySide6.QtCore import QThreadPool
+    from PySide6.QtTest import QTest
+    from update_downloader import UpdateDownloadError
+    import time
+    window.update_thread_pool = QThreadPool(window)
+    def download(_info, *, cancelled, progress):
+        while not cancelled():
+            time.sleep(0.005)
+        raise UpdateDownloadError('cancelled')
+    window.download_func = download
+    window.show_update(info())
+    window.show()
+    window.start_update_download()
+    window.close()
+    for _ in range(100):
+        QTest.qWait(10)
+        if not window._download_running and not window.isVisible():
+            break
+    assert not window._download_running
+    assert not window.isVisible()
+    assert window.update_thread_pool.waitForDone(1000)

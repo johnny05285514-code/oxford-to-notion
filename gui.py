@@ -861,6 +861,8 @@ class OxfordToNotionWindow(QMainWindow):
 
     def retranslate_ui(self) -> None:
         text = self.translator.text
+        if hasattr(self, "_toolbar_key"):
+            self.toolbar_title.setText(text(self._toolbar_key))
         self.brand_button.setText("Oxford to Notion")
         self.brand_button.setToolTip(text("nav_import"))
         self.nav_import_button.setText(text("nav_import"))
@@ -921,6 +923,7 @@ class OxfordToNotionWindow(QMainWindow):
             button.style().polish(button)
 
     def _set_toolbar_title(self, key: str) -> None:
+        self._toolbar_key = key
         self.toolbar_title.setText(self.translator.text(key))
 
     @Slot()
