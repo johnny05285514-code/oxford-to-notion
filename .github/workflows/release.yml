@@ -95,7 +95,7 @@ jobs:
         run: |
           test "$(uname -m)" = arm64
           bash scripts/build_macos_app.sh
-          lipo -verify_arch arm64 'dist/Oxford to Notion.app/Contents/MacOS/Oxford to Notion'
+          lipo 'dist/Oxford to Notion.app/Contents/MacOS/Oxford to Notion' -verify_arch arm64
           python scripts/verify_package_contents.py 'dist/Oxford to Notion.app'
           bash scripts/package_macos_dmg.sh
       - name: Verify mounted package
