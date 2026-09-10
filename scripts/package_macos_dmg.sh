@@ -26,4 +26,4 @@ hdiutil create \
   -format UDZO \
   -ov \
   "$DMG_PATH"
-shasum -a 256 "$DMG_PATH" > "$CHECKSUM_PATH"
+(cd release && shasum -a 256 "Oxford-to-Notion-macOS-arm64.dmg" > "Oxford-to-Notion-macOS-arm64.dmg.sha256")

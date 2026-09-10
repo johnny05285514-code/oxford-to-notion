@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### v1.5.3 candidate / 候选版本
+
+- 设置新增当前版本、手动检查更新、下载进度和校验后安装入口。
+- Windows 和 Apple 芯片 Mac 使用同一版本源，并通过同一流程构建；两份安装包及校验文件齐全后才允许发布。
+- 下载失败、校验失败或启动安装失败均提供中英文提示；不会自动下载或静默安装。
+- Settings now shows the installed version, manual checks, download progress and verified installer actions.
+- Windows and Apple silicon macOS share version metadata and a gated, joint release workflow.
+- Downloads and installation remain user-controlled, with localized network, integrity and launch errors.
+
+
 ### 简体中文
 
 - Windows 排查：修复配置文件被占用或不可写时的未处理错误；Notion Token 和数据库地址整组保存，失败时保留原文件，并显示中英文提示。

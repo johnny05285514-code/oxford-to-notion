@@ -1,0 +1,153 @@
+name: Publish Windows and macOS release
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        default: false
+        required: false
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish after Windows and M3 acceptance; otherwise build test artifacts only'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Validate version, notes and unused tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release_pipeline.py preflight
+
+  windows:
+    needs: preflight
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv/Scripts/python -m pip install -r requirements-macos-build.txt
+          choco install nsis --yes --no-progress
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: .venv/Scripts/python -m pytest tests -q -p no:cacheprovider --basetemp "$env:RUNNER_TEMP/oton-tests"
+      - name: Build Windows installer
+        shell: cmd
+        run: build_installer.bat --no-pause
+      - name: Verify packaged version and startup
+        shell: pwsh
+        run: |
+          $version = & .venv/Scripts/python app_version.py
+          $exe = Get-Item 'dist/Oxford to Notion.exe'
+          if ($exe.VersionInfo.ProductVersion -ne $version) { throw 'Application version mismatch' }
+          $installer = Get-Item "release/Oxford-to-Notion-Setup-$version.exe"
+          if ($installer.VersionInfo.ProductVersion -ne $version) { throw 'Installer version mismatch' }
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @('--smoke-test', '--expected-version', $version) -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw 'Packaged startup failed' }
+          .venv/Scripts/python scripts/verify_package_contents.py 'dist/Oxford to Notion.exe'
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Windows-installer
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    needs: preflight
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-macos-build.txt
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests -q -p no:cacheprovider --basetemp "$RUNNER_TEMP/oton-tests"
+      - name: Build ARM64 application and DMG
+        run: |
+          test "$(uname -m)" = arm64
+          bash scripts/build_macos_app.sh
+          lipo -verify_arch arm64 'dist/Oxford to Notion.app/Contents/MacOS/Oxford to Notion'
+          python scripts/verify_package_contents.py 'dist/Oxford to Notion.app'
+          bash scripts/package_macos_dmg.sh
+      - name: Verify mounted package
+        run: |
+          mkdir -p work/macos/mounted
+          hdiutil attach release/Oxford-to-Notion-macOS-arm64.dmg -mountpoint "$PWD/work/macos/mounted" -nobrowse -readonly
+          version="$(python app_version.py)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'work/macos/mounted/Oxford to Notion.app/Contents/Info.plist')" = "$version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' 'work/macos/mounted/Oxford to Notion.app/Contents/Info.plist')" = "$version"
+          'work/macos/mounted/Oxford to Notion.app/Contents/MacOS/Oxford to Notion' --smoke-test --expected-version "$version"
+      - name: Detach image
+        if: always()
+        run: hdiutil detach "$PWD/work/macos/mounted" || true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macOS-arm64-installer
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-installer'
+          merge-multiple: true
+          path: release
+      - run: python scripts/verify_release.py release
+
+  publish:
+    needs: verify
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-installer'
+          merge-multiple: true
+          path: release
+      - name: Verify both packages, upload draft, verify uploads and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release_pipeline.py publish
