@@ -25,6 +25,31 @@ def test_installer_never_bundles_or_deletes_private_settings():
     assert 'preserve $APPDATA\\Oxford to Notion' in script
 
 
+def test_existing_install_is_detected_and_keeps_its_original_directory():
+    script = Path("installer.nsi").read_text(encoding="utf-8")
+
+    assert 'ReadRegStr $ExistingVersion HKCU "${APP_REG_KEY}" "DisplayVersion"' in script
+    assert 'ReadRegStr $ExistingInstallDir HKCU "${APP_REG_KEY}" "InstallLocation"' in script
+    assert 'StrCpy $INSTDIR "$ExistingInstallDir"' in script
+    assert '!define MUI_PAGE_CUSTOMFUNCTION_PRE DirectoryPagePre' in script
+    assert 'Function DirectoryPagePre' in script
+    assert 'StrCmp $ExistingInstallDir "" showDirectory' in script
+    assert 'Abort' in script
+    assert '$(UpgradeDetected)' in script
+
+
+def test_installer_stops_before_a_locked_or_failed_executable_overwrite():
+    script = Path("installer.nsi").read_text(encoding="utf-8")
+
+    assert 'FindWindow $0 "" "${APP_NAME}"' in script
+    assert '$(CloseRunningApp)' in script
+    assert 'SetOverwrite try' in script
+    assert 'ClearErrors' in script
+    assert 'IfErrors installFailed' in script
+    assert 'installFailed:' in script
+    assert '$(InstallFailed)' in script
+
+
 def test_installer_build_script_builds_app_and_checksum():
     script = Path("build_installer.bat").read_text(encoding="utf-8")
 
@@ -36,3 +61,4 @@ def test_installer_build_script_builds_app_and_checksum():
     assert 'Installer checksum generation failed.' in script
     assert '.sha256' in script
     assert '--no-pause' in script
+    assert '/INPUTCHARSET UTF8' in script

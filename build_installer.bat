@@ -26,7 +26,7 @@ if errorlevel 1 exit /b 1
 set /p APP_VERSION=<work\app-version.txt
 if not defined APP_VERSION exit /b 1
 if not exist "release" mkdir "release"
-"%MAKENSIS%" /V2 /DAPP_VERSION=%APP_VERSION% installer.nsi
+"%MAKENSIS%" /V2 /INPUTCHARSET UTF8 /DAPP_VERSION=%APP_VERSION% installer.nsi
 if errorlevel 1 (
     echo.
     echo Installer build failed.

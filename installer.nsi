@@ -23,6 +23,9 @@ ShowInstDetails show
 ShowUninstDetails show
 BrandingText "Oxford to Notion"
 
+Var ExistingVersion
+Var ExistingInstallDir
+
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
@@ -40,6 +43,7 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
+!define MUI_PAGE_CUSTOMFUNCTION_PRE DirectoryPagePre
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
@@ -52,10 +56,24 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "SimpChinese"
 
+LangString UpgradeDetected ${LANG_ENGLISH} "Oxford to Notion $ExistingVersion is installed. This setup will update it to ${APP_VERSION} in the existing folder."
+LangString UpgradeDetected ${LANG_SIMPCHINESE} "检测到 Oxford to Notion $ExistingVersion。安装程序将沿用原目录并更新至 ${APP_VERSION}。"
+LangString CloseRunningApp ${LANG_ENGLISH} "Oxford to Notion is still running. Close it, then choose Retry."
+LangString CloseRunningApp ${LANG_SIMPCHINESE} "Oxford to Notion 仍在运行。请关闭软件，然后选择“重试”。"
+LangString InstallFailed ${LANG_ENGLISH} "The existing application could not be replaced. The update has stopped; your current installation and personal settings were not removed."
+LangString InstallFailed ${LANG_SIMPCHINESE} "无法替换现有程序，更新已停止。当前安装和个人设置没有被删除。"
+
 Section "Oxford to Notion (required)" SecMain
     SectionIn RO
     SetOutPath "$INSTDIR"
-    SetOverwrite on
+    SetOverwrite try
+checkRunning:
+    FindWindow $0 "" "${APP_NAME}"
+    StrCmp $0 0 appClosed
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(CloseRunningApp)" IDRETRY checkRunning IDCANCEL installCancelled
+installCancelled:
+    Abort
+appClosed:
     Delete "$INSTDIR\Oxford-to-Notion-v1.3.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.1.ico"
@@ -65,12 +83,18 @@ Section "Oxford to Notion (required)" SecMain
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.5.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.6.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.7.ico"
+    ClearErrors
     File "dist\${APP_EXE}"
+    IfErrors installFailed
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.8.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.5.0.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.5.1.ico"
+    ClearErrors
     File /oname=app-icon.ico "assets\app-icon.ico"
+    IfErrors installFailed
+    ClearErrors
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+    IfErrors installFailed
 
     CreateShortcut "$SMPROGRAMS\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app-icon.ico" 0
     IfFileExists "$DESKTOP\Oxford to Notion.lnk" 0 +2
@@ -85,6 +109,12 @@ Section "Oxford to Notion (required)" SecMain
     WriteRegStr HKCU "${APP_REG_KEY}" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
     WriteRegDWORD HKCU "${APP_REG_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${APP_REG_KEY}" "NoRepair" 1
+    Goto installComplete
+
+installFailed:
+    MessageBox MB_ICONSTOP|MB_OK "$(InstallFailed)"
+    Abort
+installComplete:
 SectionEnd
 
 Section /o "Desktop shortcut" SecDesktop
@@ -120,6 +150,19 @@ SectionEnd
 Function .onInit
     !insertmacro MUI_LANGDLL_DISPLAY
     SectionSetFlags ${SecDesktop} ${SF_SELECTED}
+    ReadRegStr $ExistingVersion HKCU "${APP_REG_KEY}" "DisplayVersion"
+    ReadRegStr $ExistingInstallDir HKCU "${APP_REG_KEY}" "InstallLocation"
+    StrCmp $ExistingInstallDir "" initDone
+    StrCpy $INSTDIR "$ExistingInstallDir"
+    StrCmp $ExistingVersion "" initDone
+    MessageBox MB_ICONINFORMATION|MB_OK "$(UpgradeDetected)"
+initDone:
+FunctionEnd
+
+Function DirectoryPagePre
+    StrCmp $ExistingInstallDir "" showDirectory
+    Abort
+showDirectory:
 FunctionEnd
 
 Function un.onInit

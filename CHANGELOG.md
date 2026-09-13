@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### v1.5.5
+
+- 升级时自动沿用并锁定原安装目录，避免误装出两份软件。
+- 安装器会显示旧版到新版的升级提示，并在软件仍运行或文件无法替换时明确中止。
+- Existing installations now keep their registered folder, preventing accidental side-by-side copies during an update.
+- Setup identifies the version being upgraded and stops clearly if the app is still running or replacement fails.
+
 ### v1.5.4
 
 - 调整中文分区标题的字重与顶部留白，让“关于与更新”等标题显示更自然。
