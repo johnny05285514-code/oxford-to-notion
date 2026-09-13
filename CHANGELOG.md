@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-### v1.5.3 candidate / 候选版本
+### v1.5.4
+
+- 调整中文分区标题的字重与顶部留白，让“关于与更新”等标题显示更自然。
+- Refined Chinese section headings with a lighter weight and extra top breathing room for cleaner rendering.
+
+### v1.5.3
 
 - 设置新增当前版本、手动检查更新、下载进度和校验后安装入口。
 - Windows 和 Apple 芯片 Mac 使用同一版本源，并通过同一流程构建；两份安装包及校验文件齐全后才允许发布。

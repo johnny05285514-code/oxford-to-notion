@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 import gui
@@ -76,6 +77,19 @@ def test_import_title_wraps_without_clipping_at_minimum_size(monkeypatch):
     ).height()
 
     assert label.height() >= wrapped_height
+    window.close()
+
+
+def test_section_titles_use_demi_bold_text_with_top_breathing_room(monkeypatch):
+    app, window = _make_window(monkeypatch, [])
+    window.show_settings_page()
+    window.show()
+    app.processEvents()
+
+    heading = window.about_heading
+
+    assert heading.font().weight() == QFont.Weight.DemiBold
+    assert heading.contentsRect().top() >= 2
     window.close()
 
 

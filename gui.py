@@ -113,7 +113,8 @@ QLabel#pageSubtitle, QLabel#muted { color: #6b7280; }
 QLabel#sectionTitle {
     color: #16213b;
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 600;
+    padding-top: 2px;
 }
 QLineEdit {
     min-height: 48px;

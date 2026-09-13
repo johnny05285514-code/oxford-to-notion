@@ -10,7 +10,7 @@ Languages: [简体中文](README.md) | [English](README.en.md)
 
 Settings → About and updates shows the installed version. Choose Check for updates, then Download update. After SHA-256 verification, Windows offers Install now to open the visible installer; macOS offers Open installer, followed by quitting the app and dragging it into Applications / Replace. Configuration and history are preserved.
 
-Version 1.5.2 needs one manual update from Releases first. Version 1.5.3 on this branch is undergoing acceptance testing; use the currently published Release for a stable download. Daily checks never automatically download or silently install. Unsupported platforms open the release page instead.
+Version 1.5.2 needs one manual update from Releases first. Starting with v1.5.3, updates can be checked and downloaded in the app. Daily checks never automatically download or silently install. Unsupported platforms open the release page instead.
 
 [View the changelog](CHANGELOG.md)
 
@@ -27,7 +27,7 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download the Windows installer for the release, for example `Oxford-to-Notion-Setup-1.5.3.exe`
+2. Download the Windows installer for the release, for example `Oxford-to-Notion-Setup-1.5.4.exe`
 3. Run the installer and follow the prompts
 4. Open `Oxford to Notion` from the desktop or Start menu
 5. Follow the five-step first-run wizard to configure and test Notion
