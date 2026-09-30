@@ -29,7 +29,9 @@ A Python desktop app and CLI that imports Oxford Learner's Dictionaries entries 
 普通用户不需要安装 Python，也不需要自己构建程序：
 
 1. 打开 [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. 下载对应版本的 Windows 安装包，例如 `Oxford-to-Notion-Setup-1.5.5.exe`
+2. 下载对应版本的 Windows 安装包，例如 `Oxford-to-Notion-Setup-1.5.6.exe`
+
+最近导入的词条支持右键菜单：选择“重新导入此词”即可刷新已有词条；问号说明提供详细解释。请将个人笔记保留在软件管理的 Oxford 内容区域之外。
 3. 双击安装包，按提示完成安装
 4. 从桌面或开始菜单打开 `Oxford to Notion`
 5. 第一次打开时按照五步向导完成 Notion 配置和连接测试

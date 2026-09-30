@@ -67,6 +67,28 @@ def item(word, url=None, oxford_url=None):
     )
 
 
+def test_reimport_uses_existing_import_flow_and_ignores_busy(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch, history=[item("emit")])
+    monkeypatch.setattr(window, "thread_pool", HoldingThreadPool())
+    window.reimport_history_item(item("emit"))
+    assert window.word_entry.text() == "emit"
+    assert len(window.thread_pool.jobs) == 1
+    window.reimport_history_item(item("other"))
+    assert window.word_entry.text() == "emit"
+    assert len(window.thread_pool.jobs) == 1
+    window.set_busy(False)
+    window.close()
+
+
+def test_history_menu_has_reimport_and_explanation(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    menu = window.build_history_menu(item("emit"))
+    assert len(menu.actions()) == 2
+    assert "重新导入" in menu.actions()[0].text()
+    assert "?" in menu.actions()[1].text()
+    window.close()
+
+
 def test_empty_history_and_no_update_are_hidden(monkeypatch):
     _app, window, _saved = make_window(monkeypatch)
 

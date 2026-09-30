@@ -18,6 +18,9 @@ SUPPORTED_LANGUAGE_CODES = frozenset(language.code for language in SUPPORTED_LAN
 
 
 ENGLISH_MESSAGES = {
+    "reimport_word": "Reimport this word",
+    "reimport_help": "? What does reimport do?",
+    "reimport_explanation": "Fetch fresh dictionary content from Oxford and update the existing Notion page. Personal notes outside the app-managed Oxford section are preserved. No duplicate page is created when the matching word already exists.",
     "about_updates": "About and updates",
     "current_version": "Current version: v{version}",
     "check_updates": "Check for updates",
@@ -140,6 +143,9 @@ ENGLISH_MESSAGES = {
 }
 
 CHINESE_MESSAGES = {
+    "reimport_word": "重新导入此词",
+    "reimport_help": "? 重新导入有什么用？",
+    "reimport_explanation": "重新从 Oxford 获取词典内容，更新已有的 Notion 页面。软件管理的 Oxford 内容区域之外的个人笔记会保留；已有匹配单词时，不会新建重复页面。",
     "about_updates": "关于与更新",
     "current_version": "当前版本：v{version}",
     "check_updates": "检查更新",

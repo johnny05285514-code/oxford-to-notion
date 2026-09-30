@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QProgressBar,
     QScrollArea,
@@ -1078,7 +1080,31 @@ class OxfordToNotionWindow(QMainWindow):
         button.setText(f"{item.word} " + chr(0x2197))
         button.setToolTip(self.translator.text(self.history_tooltip_key(), word=item.word))
         button.clicked.connect(lambda _checked=False, url=self.history_url(item): self.open_external_url(url))
+        button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        button.customContextMenuRequested.connect(
+            lambda position: self.build_history_menu(item).exec(button.mapToGlobal(position))
+        )
         return button
+
+    def build_history_menu(self, item: ImportHistoryItem) -> QMenu:
+        menu = QMenu(self)
+        action = menu.addAction(self.translator.text("reimport_word"))
+        action.setEnabled(not self._import_busy)
+        action.triggered.connect(lambda: self.reimport_history_item(item))
+        help_action = menu.addAction(self.translator.text("reimport_help"))
+        help_action.triggered.connect(lambda: QMessageBox.information(
+            self, self.translator.text("reimport_word"),
+            self.translator.text("reimport_explanation"),
+        ))
+        menu.aboutToHide.connect(menu.deleteLater)
+        return menu
+
+    def reimport_history_item(self, item: ImportHistoryItem) -> None:
+        if self._import_busy:
+            return
+        self.show_main_page()
+        self.word_entry.setText(item.word)
+        self.start_import()
 
     @staticmethod
     def _clear_layout(layout: QVBoxLayout) -> None:

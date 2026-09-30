@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### v1.5.6
+
+- 历史词条右键菜单新增“重新导入此词”和中英文用途说明，保留原有点击跳转方式。
+- 导入过程中禁止重复触发重新导入；复用现有的笔记保护与更新流程。
+- History context menus now offer reimport and bilingual help while preserving normal click navigation.
+- Reimport uses the existing note-preserving import flow and cannot be triggered while an import is running.
+
 ### v1.5.5
 
 - 升级时自动沿用并锁定原安装目录，避免误装出两份软件。
