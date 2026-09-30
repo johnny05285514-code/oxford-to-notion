@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from time import perf_counter
+from time import perf_counter, monotonic
 from typing import Any
 from urllib.parse import urlparse
 
@@ -105,15 +105,20 @@ class NotionWriter:
         database_id: str,
         today: Callable[[], date] = lambda: datetime.now(timezone.utc),
         clock: Callable[[], float] = perf_counter,
+        cache_clock: Callable[[], float] = monotonic,
     ) -> None:
         self.client = client
         self.database_id = database_id
         self.today = today
         self.clock = clock
         self.last_timing: NotionTiming | None = None
+        self.cache_clock = cache_clock
+        self._schema_cache = None
+        self._schema_cached_at = 0.0
 
     def validate_connection(self) -> str:
         """Validate database access and schema without writing any data."""
+        self._schema_cache = None
         data_source_id, schema = self._resolve_data_source()
         self._validate_schema(schema)
         return data_source_id
@@ -158,18 +163,31 @@ class NotionWriter:
         try:
             data_source_id, schema = self._resolve_data_source()
             self._validate_schema(schema)
-            response = self.client.data_sources.query(
-                data_source_id=data_source_id,
-                sorts=[{"property": "Added Date", "direction": "descending"}],
-                page_size=bounded_limit,
-            )
-            items = [
-                item
-                for page in response.get("results", [])
-                if (item := self._recent_item(page)) is not None
-            ]
+            items = []
+            cursor = None
+            seen_cursors = set()
+            for _ in range(10):
+                kwargs = dict(
+                    data_source_id=data_source_id,
+                    sorts=[{"property": "Added Date", "direction": "descending"}],
+                    page_size=bounded_limit,
+                )
+                if cursor:
+                    kwargs["start_cursor"] = cursor
+                response = self.client.data_sources.query(**kwargs)
+                items.extend(
+                    item for page in response.get("results", [])
+                    if (item := self._recent_item(page)) is not None
+                )
+                if len(items) >= bounded_limit or not response.get("has_more"):
+                    break
+                cursor = response.get("next_cursor")
+                if not cursor or cursor in seen_cursors:
+                    break
+                seen_cursors.add(cursor)
             return items[:bounded_limit]
         except NotionSchemaError:
+            self._schema_cache = None
             raise
         except (
             APIResponseError,
@@ -178,6 +196,7 @@ class NotionWriter:
             httpx.RequestError,
             OSError,
         ) as exc:
+            self._schema_cache = None
             raise NotionSyncError("Notion recent history request failed.") from exc
 
     def upsert(self, entry: WordEntry) -> str:
@@ -236,6 +255,7 @@ class NotionWriter:
             )
             return page_url
         except NotionSchemaError:
+            self._schema_cache = None
             raise
         except (
             APIResponseError,
@@ -244,16 +264,23 @@ class NotionWriter:
             httpx.RequestError,
             OSError,
         ) as exc:
+            self._schema_cache = None
             raise NotionWriteError("Notion API request failed. Check the token, database sharing, and permissions.") from exc
 
     def _resolve_data_source(self) -> tuple[str, dict[str, Any]]:
+        if self._schema_cache is not None and self.cache_clock() - self._schema_cached_at < 300:
+            return self._schema_cache
         database = self.client.databases.retrieve(database_id=self.database_id)
         sources = database.get("data_sources", [])
         if not sources:
             raise NotionSchemaError("The Notion database has no accessible data source.")
         data_source_id = sources[0]["id"]
         data_source = self.client.data_sources.retrieve(data_source_id=data_source_id)
-        return data_source_id, data_source.get("properties", {})
+        schema = data_source.get("properties", {})
+        self._validate_schema(schema)
+        self._schema_cache = data_source_id, schema
+        self._schema_cached_at = self.cache_clock()
+        return self._schema_cache
 
     @staticmethod
     def _validate_schema(schema: dict[str, Any]) -> None:

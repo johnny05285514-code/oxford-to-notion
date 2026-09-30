@@ -37,7 +37,7 @@ from app_version import CURRENT_VERSION
 from exceptions import AppError
 from history_store import ImportHistoryItem, add_history_item, read_history, replace_history_items
 from i18n import Translator, detect_system_language, localize_error
-from import_service import ImportResult, import_word
+from import_service import DependencyCache, ImportResult, import_word
 from language_menu import LanguageMenuButton
 from oxford_client import build_oxford_search_url
 from recent_sync import sync_recent_history
@@ -305,7 +305,10 @@ class ModernComboBox(QComboBox):
 
 def build_ui_font() -> QFont:
     font = QFont()
-    font.setFamilies(["Segoe UI", "Microsoft YaHei UI"])
+    if sys.platform == "darwin":
+        font.setFamilies([".AppleSystemUIFont", "PingFang SC"])
+    else:
+        font.setFamilies(["Segoe UI", "Microsoft YaHei UI"])
     font.setPointSize(10)
     font.setHintingPreference(QFont.HintingPreference.PreferVerticalHinting)
     font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
@@ -444,7 +447,7 @@ class OxfordToNotionWindow(QMainWindow):
         recent_sync_clock: Callable[[], float] = monotonic,
     ) -> None:
         super().__init__()
-        self.import_func = import_func
+        self.import_func = DependencyCache().import_word if import_func is import_word else import_func
         self.history_reader = history_reader
         self.history_adder = history_adder
         self.history_replacer = history_replacer
@@ -461,7 +464,7 @@ class OxfordToNotionWindow(QMainWindow):
         self._close_pending = False
         self._import_busy = False
         self._mac_installer_opened = False
-        self.recent_sync_func = recent_sync_func
+        self.recent_sync_func = DependencyCache().list_recent if recent_sync_func is sync_recent_history else recent_sync_func
         self.enable_recent_sync = enable_recent_sync
         self.recent_sync_clock = recent_sync_clock
         self.thread_pool = QThreadPool(self)

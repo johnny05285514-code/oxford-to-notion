@@ -1,16 +1,13 @@
 from typing import Any
 
-from notion_client import Client
-
-from config import Settings
+from import_service import build_dependencies
 from history_store import ImportHistoryItem
 from notion_writer import NotionWriter
 
 
 def build_recent_reader() -> NotionWriter:
-    settings = Settings.from_env()
-    client = Client(auth=settings.notion_token)
-    return NotionWriter(client, settings.notion_database_id)
+    # Worker-local connections keep imports and background reads isolated.
+    return build_dependencies()[1]
 
 
 def sync_recent_history(

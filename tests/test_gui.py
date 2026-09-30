@@ -18,7 +18,8 @@ class HoldingThreadPool:
         self.worker = worker
 
 
-def test_ui_font_has_explicit_latin_and_chinese_families():
+def test_ui_font_has_explicit_latin_and_chinese_families(monkeypatch):
+    monkeypatch.setattr(gui.sys, "platform", "win32")
     font = build_ui_font()
 
     assert font.families()[:2] == ["Segoe UI", "Microsoft YaHei UI"]

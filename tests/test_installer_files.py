@@ -62,3 +62,12 @@ def test_installer_build_script_builds_app_and_checksum():
     assert '.sha256' in script
     assert '--no-pause' in script
     assert '/INPUTCHARSET UTF8' in script
+
+
+def test_installer_stages_validates_and_restores_before_registration():
+    script = Path("installer.nsi").read_text(encoding="utf-8")
+    assert 'SetOutPath "$PLUGINSDIR\\payload"' in script
+    assert '--expected-version ${APP_VERSION}' in script
+    assert 'Rename "$INSTDIR\\${APP_EXE}" "$INSTDIR\\${APP_EXE}.previous"' in script
+    assert 'rollbackInstall:' in script
+    assert script.index('ExecWait') < script.index('WriteRegStr HKCU')

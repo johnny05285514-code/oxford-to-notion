@@ -90,6 +90,39 @@ def test_build_properties_maps_entry_summary():
     assert props["Added Date"]["date"]["start"] == "2026-06-21"
 
 
+def test_schema_cache_expires_and_connection_test_bypasses_it():
+    client = FakeClient([])
+    now = [0.0]
+    writer = NotionWriter(client, "database-id", cache_clock=lambda: now[0])
+    writer.list_recent()
+    writer.list_recent()
+    assert len(client.databases.calls) == 1
+    now[0] = 301
+    writer.list_recent()
+    assert len(client.databases.calls) == 2
+    writer.validate_connection()
+    assert len(client.databases.calls) == 3
+
+
+def test_recent_fills_valid_records_from_next_page():
+    client = FakeClient([])
+    client.data_sources.responses["query"] = lambda **kwargs: (
+        {"results": [recent_page(word="")], "has_more": True, "next_cursor": "next"}
+        if "start_cursor" not in kwargs else
+        {"results": [recent_page(word="valid")], "has_more": False}
+    )
+    assert [x.word for x in NotionWriter(client, "database-id").list_recent(1)] == ["valid"]
+
+
+def test_recent_repeated_cursor_is_bounded():
+    client = FakeClient([])
+    client.data_sources.responses["query"] = {
+        "results": [], "has_more": True, "next_cursor": "same"
+    }
+    assert NotionWriter(client, "database-id").list_recent() == []
+    assert sum(name == "query" for name, _ in client.data_sources.calls) == 2
+
+
 def test_build_blocks_preserves_oxford_style_hierarchy():
     blocks = build_blocks(ENTRY)
 

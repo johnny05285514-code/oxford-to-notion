@@ -69,6 +69,9 @@ jobs:
           $process = Start-Process -FilePath $exe.FullName -ArgumentList @('--smoke-test', '--expected-version', $version) -Wait -PassThru -WindowStyle Hidden
           if ($process.ExitCode -ne 0) { throw 'Packaged startup failed' }
           .venv/Scripts/python scripts/verify_package_contents.py 'dist/Oxford to Notion.exe'
+      - name: Verify installer failure rollback
+        shell: pwsh
+        run: ./scripts/test_installer_rollback.ps1
       - uses: actions/upload-artifact@v6
         with:
           name: Windows-installer

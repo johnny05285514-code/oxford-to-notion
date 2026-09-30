@@ -27,7 +27,7 @@ The desktop app provides a word input, import button, settings screen, and a lin
 Regular users do not need to install Python or build the project:
 
 1. Open [GitHub Releases](https://github.com/johnny05285514-code/oxford-to-notion/releases/latest)
-2. Download the Windows installer for the release, for example `Oxford-to-Notion-Setup-1.5.6.exe`
+2. Download the Windows installer for the release, for example `Oxford-to-Notion-Setup-1.5.7.exe`
 
 Right-click a recent word to reimport it. Context-menu help explains this action. Keep personal notes outside the app-managed Oxford content section.
 3. Run the installer and follow the prompts

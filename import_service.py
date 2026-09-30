@@ -2,6 +2,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
+from threading import Lock
+from contextlib import contextmanager
 
 from notion_client import Client
 
@@ -24,6 +26,40 @@ class ImportResult:
     page_url: str
     oxford_url: str
     timing: ImportTiming | None = None
+
+
+class DependencyCache:
+    """Own connections across Qt runnable callbacks, which lose thread locals."""
+
+    def __init__(self):
+        self.lock = Lock()
+        self.key = None
+        self.value = None
+
+    @contextmanager
+    def acquire(self):
+        with self.lock:
+            settings = Settings.from_env()
+            key = (settings.notion_token, settings.notion_database_id)
+            if self.key != key:
+                if self.value is not None:
+                    self.value[0].session.close()
+                    self.value[1].client.close()
+                self.value = None
+                self.key = None
+                self.value = (OxfordClient(), NotionWriter(
+                    Client(auth=settings.notion_token), settings.notion_database_id,
+                ))
+                self.key = key
+            yield self.value
+
+    def import_word(self, word):
+        with self.acquire() as (oxford, notion):
+            return import_word(word, oxford=oxford, notion=notion)
+
+    def list_recent(self):
+        with self.acquire() as (_, notion):
+            return notion.list_recent(limit=100)
 
 
 def build_dependencies() -> tuple[OxfordClient, NotionWriter]:

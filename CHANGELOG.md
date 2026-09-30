@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### v1.5.7
+
+- Windows 安装器先解压验证新版，再备份并替换程序文件；替换失败时尝试恢复旧文件，个人配置不参与替换。
+- 后台线程复用连接，字段结构缓存五分钟；配置变化或请求失败后重新检查，手动测试连接始终读取最新结构。
+- Recent 翻页补齐最多 100 条有效记录，最多读取 10 页并防止重复游标循环。
+- Mac 使用系统字体和 PingFang 中文回退，Windows 字体保持不变。
+- Windows setup stages and validates the new app, backs up old program files, and restores them if replacement fails.
+- Worker-local connection reuse and a five-minute schema cache reduce repeated requests; configuration changes and failures invalidate cached checks.
+- Recent reads additional pages to fill valid history, with a ten-page safety limit and repeated-cursor protection.
+- macOS uses system fonts with PingFang fallback; Windows fonts remain unchanged.
+
 ### v1.5.6
 
 - 历史词条右键菜单新增“重新导入此词”和中英文用途说明，保留原有点击跳转方式。

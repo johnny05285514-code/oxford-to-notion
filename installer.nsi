@@ -1,4 +1,8 @@
 Unicode True
+Var BackupExe
+Var BackupIcon
+Var BackupUninstaller
+Var ReplaceStarted
 
 !include "MUI2.nsh"
 !include "Sections.nsh"
@@ -62,6 +66,8 @@ LangString CloseRunningApp ${LANG_ENGLISH} "Oxford to Notion is still running. C
 LangString CloseRunningApp ${LANG_SIMPCHINESE} "Oxford to Notion 仍在运行。请关闭软件，然后选择“重试”。"
 LangString InstallFailed ${LANG_ENGLISH} "The existing application could not be replaced. The update has stopped; your current installation and personal settings were not removed."
 LangString InstallFailed ${LANG_SIMPCHINESE} "无法替换现有程序，更新已停止。当前安装和个人设置没有被删除。"
+LangString RecoveryFailed ${LANG_ENGLISH} "Update failed and some old files could not be restored. Recovery files remain in the installation folder with a .previous suffix. Do not delete them. Personal settings were not changed."
+LangString RecoveryFailed ${LANG_SIMPCHINESE} "更新失败，部分旧文件无法自动恢复。安装目录中的 .previous 文件是恢复备份，请勿删除。个人配置未被修改。"
 
 Section "Oxford to Notion (required)" SecMain
     SectionIn RO
@@ -74,6 +80,54 @@ checkRunning:
 installCancelled:
     Abort
 appClosed:
+    InitPluginsDir
+    SetOutPath "$PLUGINSDIR\payload"
+    ClearErrors
+    File "dist\${APP_EXE}"
+    File /oname=app-icon.ico "assets\app-icon.ico"
+    WriteUninstaller "$PLUGINSDIR\payload\Uninstall.exe"
+    IfErrors installFailed
+    ExecWait '"$PLUGINSDIR\payload\${APP_EXE}" --smoke-test --expected-version ${APP_VERSION}' $0
+    IfErrors installFailed
+    StrCmp $0 0 0 installFailed
+    StrCpy $BackupExe 0
+    StrCpy $BackupIcon 0
+    StrCpy $BackupUninstaller 0
+    StrCpy $ReplaceStarted 0
+    ; Never overwrite an earlier recovery backup.
+    IfFileExists "$INSTDIR\${APP_EXE}.previous" installFailed
+    IfFileExists "$INSTDIR\app-icon.ico.previous" installFailed
+    IfFileExists "$INSTDIR\Uninstall.exe.previous" installFailed
+    IfFileExists "$INSTDIR\${APP_EXE}" 0 backupIcon
+    ClearErrors
+    Rename "$INSTDIR\${APP_EXE}" "$INSTDIR\${APP_EXE}.previous"
+    IfErrors rollbackInstall
+    StrCpy $BackupExe 1
+backupIcon:
+    IfFileExists "$INSTDIR\app-icon.ico" 0 backupUninstaller
+    ClearErrors
+    Rename "$INSTDIR\app-icon.ico" "$INSTDIR\app-icon.ico.previous"
+    IfErrors rollbackInstall
+    StrCpy $BackupIcon 1
+backupUninstaller:
+    IfFileExists "$INSTDIR\Uninstall.exe" 0 replaceFiles
+    ClearErrors
+    Rename "$INSTDIR\Uninstall.exe" "$INSTDIR\Uninstall.exe.previous"
+    IfErrors rollbackInstall
+    StrCpy $BackupUninstaller 1
+replaceFiles:
+    StrCpy $ReplaceStarted 1
+    ClearErrors
+    CopyFiles /SILENT "$PLUGINSDIR\payload\${APP_EXE}" "$INSTDIR\${APP_EXE}"
+    IfErrors rollbackInstall
+    CopyFiles /SILENT "$PLUGINSDIR\payload\app-icon.ico" "$INSTDIR\app-icon.ico"
+    IfErrors rollbackInstall
+    CopyFiles /SILENT "$PLUGINSDIR\payload\Uninstall.exe" "$INSTDIR\Uninstall.exe"
+    IfErrors rollbackInstall
+    ExecWait '"$INSTDIR\${APP_EXE}" --smoke-test --expected-version ${APP_VERSION}' $0
+    IfErrors rollbackInstall
+    StrCmp $0 0 0 rollbackInstall
+    SetOutPath "$INSTDIR"
     Delete "$INSTDIR\Oxford-to-Notion-v1.3.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.1.ico"
@@ -83,18 +137,9 @@ appClosed:
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.5.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.6.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.7.ico"
-    ClearErrors
-    File "dist\${APP_EXE}"
-    IfErrors installFailed
     Delete "$INSTDIR\Oxford-to-Notion-v1.4.8.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.5.0.ico"
     Delete "$INSTDIR\Oxford-to-Notion-v1.5.1.ico"
-    ClearErrors
-    File /oname=app-icon.ico "assets\app-icon.ico"
-    IfErrors installFailed
-    ClearErrors
-    WriteUninstaller "$INSTDIR\Uninstall.exe"
-    IfErrors installFailed
 
     CreateShortcut "$SMPROGRAMS\Oxford to Notion.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\app-icon.ico" 0
     IfFileExists "$DESKTOP\Oxford to Notion.lnk" 0 +2
@@ -109,9 +154,42 @@ appClosed:
     WriteRegStr HKCU "${APP_REG_KEY}" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
     WriteRegDWORD HKCU "${APP_REG_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${APP_REG_KEY}" "NoRepair" 1
+    Delete "$INSTDIR\${APP_EXE}.previous"
+    Delete "$INSTDIR\app-icon.ico.previous"
+    Delete "$INSTDIR\Uninstall.exe.previous"
     Goto installComplete
 
+rollbackInstall:
+    StrCmp $ReplaceStarted 1 0 restoreBackups
+    Delete "$INSTDIR\${APP_EXE}"
+    Delete "$INSTDIR\app-icon.ico"
+    Delete "$INSTDIR\Uninstall.exe"
+restoreBackups:
+    StrCpy $1 0
+    ClearErrors
+    StrCmp $BackupExe 1 0 restoreIcon
+    Rename "$INSTDIR\${APP_EXE}.previous" "$INSTDIR\${APP_EXE}"
+    IfErrors 0 +2
+    StrCpy $1 1
+restoreIcon:
+    ClearErrors
+    StrCmp $BackupIcon 1 0 restoreUninstaller
+    Rename "$INSTDIR\app-icon.ico.previous" "$INSTDIR\app-icon.ico"
+    IfErrors 0 +2
+    StrCpy $1 1
+restoreUninstaller:
+    ClearErrors
+    StrCmp $BackupUninstaller 1 0 recoveryDone
+    Rename "$INSTDIR\Uninstall.exe.previous" "$INSTDIR\Uninstall.exe"
+    IfErrors 0 +2
+    StrCpy $1 1
+recoveryDone:
+    StrCmp $1 1 0 installFailed
+    SetErrorLevel 1
+    MessageBox MB_ICONSTOP|MB_OK "$(RecoveryFailed)"
+    Abort
 installFailed:
+    SetErrorLevel 1
     MessageBox MB_ICONSTOP|MB_OK "$(InstallFailed)"
     Abort
 installComplete:
