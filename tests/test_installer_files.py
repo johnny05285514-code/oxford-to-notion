@@ -70,4 +70,5 @@ def test_installer_stages_validates_and_restores_before_registration():
     assert '--expected-version ${APP_VERSION}' in script
     assert 'Rename "$INSTDIR\\${APP_EXE}" "$INSTDIR\\${APP_EXE}.previous"' in script
     assert 'rollbackInstall:' in script
+    assert '"$(InstallFailed)" /SD IDOK' in script
     assert script.index('ExecWait') < script.index('WriteRegStr HKCU')

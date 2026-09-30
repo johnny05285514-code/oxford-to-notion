@@ -76,7 +76,7 @@ Section "Oxford to Notion (required)" SecMain
 checkRunning:
     FindWindow $0 "" "${APP_NAME}"
     StrCmp $0 0 appClosed
-    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(CloseRunningApp)" IDRETRY checkRunning IDCANCEL installCancelled
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "$(CloseRunningApp)" /SD IDCANCEL IDRETRY checkRunning IDCANCEL installCancelled
 installCancelled:
     Abort
 appClosed:
@@ -186,11 +186,11 @@ restoreUninstaller:
 recoveryDone:
     StrCmp $1 1 0 installFailed
     SetErrorLevel 1
-    MessageBox MB_ICONSTOP|MB_OK "$(RecoveryFailed)"
+    MessageBox MB_ICONSTOP|MB_OK "$(RecoveryFailed)" /SD IDOK
     Abort
 installFailed:
     SetErrorLevel 1
-    MessageBox MB_ICONSTOP|MB_OK "$(InstallFailed)"
+    MessageBox MB_ICONSTOP|MB_OK "$(InstallFailed)" /SD IDOK
     Abort
 installComplete:
 SectionEnd
@@ -233,7 +233,7 @@ Function .onInit
     StrCmp $ExistingInstallDir "" initDone
     StrCpy $INSTDIR "$ExistingInstallDir"
     StrCmp $ExistingVersion "" initDone
-    MessageBox MB_ICONINFORMATION|MB_OK "$(UpgradeDetected)"
+    MessageBox MB_ICONINFORMATION|MB_OK "$(UpgradeDetected)" /SD IDOK
 initDone:
 FunctionEnd
 

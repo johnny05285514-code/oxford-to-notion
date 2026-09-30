@@ -10,7 +10,11 @@ $icon = Join-Path $folder 'app-icon.ico'
 [IO.File]::WriteAllText($icon, 'old-icon-sentinel')
 $lock = [IO.File]::Open($icon, 'Open', 'ReadWrite', 'None')
 try {
-    $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$folder") -Wait -PassThru -WindowStyle Hidden
+    $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$folder") -PassThru -WindowStyle Hidden
+    if (-not $process.WaitForExit(120000)) {
+        $process.Kill()
+        throw 'Installer rollback test timed out'
+    }
     if ($process.ExitCode -eq 0) { throw 'Expected an installation failure' }
     if ([IO.File]::ReadAllText($exe) -ne 'old-executable-sentinel') { throw 'Old executable was not restored' }
     if (Test-Path ($exe + '.previous')) { throw 'Restored executable left an unexpected backup' }
