@@ -55,7 +55,7 @@ from settings_store import (
 )
 from setup_wizard import ConnectionWorker, SetupWizard
 from update_checker import UpdateInfo, check_for_update, valid_download_info
-from update_downloader import download_update, cleanup_partial_downloads, UpdateDownloadError
+from update_downloader import download_update, cleanup_partial_downloads, cleanup_old_packages, UpdateDownloadError
 
 
 SUMMARY_HISTORY_ITEMS = 5
@@ -316,6 +316,7 @@ def build_ui_font() -> QFont:
 
 
 class ImportSignals(QObject):
+    progress = Signal(str, object)
     succeeded = Signal(object)
     failed = Signal(str)
 
@@ -330,7 +331,10 @@ class ImportWorker(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            result = self.import_func(self.word)
+            if isinstance(getattr(self.import_func, "__self__", None), DependencyCache):
+                result = self.import_func(self.word, progress=lambda stage, **values: self.signals.progress.emit(stage, values))
+            else:
+                result = self.import_func(self.word)
         except (AppError, ValueError) as exc:
             self.signals.failed.emit(str(exc))
         except Exception:
@@ -540,6 +544,7 @@ class OxfordToNotionWindow(QMainWindow):
             self.show_wizard_page()
         if start_update_check:
             cleanup_partial_downloads(updates_directory())
+            cleanup_old_packages(updates_directory(), CURRENT_VERSION)
             self.start_update_check()
 
     def _build_sidebar(self) -> QFrame:
@@ -618,7 +623,16 @@ class OxfordToNotionWindow(QMainWindow):
         form_layout.addWidget(self.word_entry)
         self.import_button = QPushButton(objectName="primary")
         self.import_button.clicked.connect(self.start_import)
-        form_layout.addWidget(self.import_button)
+        import_actions = QHBoxLayout()
+        import_actions.addWidget(self.import_button, 1)
+        self.batch_button = QPushButton(objectName="secondary")
+        self.batch_button.clicked.connect(self.open_batch_import)
+        import_actions.addWidget(self.batch_button)
+        form_layout.addLayout(import_actions)
+        self._batch_dialog = None
+        self._failed_word = ""
+        self._active_word = ""
+        self._import_stage = "stage_oxford"
         layout.addWidget(form)
 
         self.status_label = QLabel(objectName="muted")
@@ -640,12 +654,21 @@ class OxfordToNotionWindow(QMainWindow):
         self.open_button.setFixedWidth(164)
         self.open_button.clicked.connect(self.open_notion_page)
         self.open_button.hide()
+        self.cleanup_button = QPushButton(objectName="secondary")
+        self.cleanup_button.hide()
+        self.cleanup_button.clicked.connect(self.retry_cleanup)
+        self._cleanup_retry = None
         self.open_spacing = QWidget()
         self.open_spacing.setFixedHeight(10)
         self.open_spacing.hide()
         open_row = QHBoxLayout()
         open_row.addStretch(1)
         open_row.addWidget(self.open_button)
+        open_row.addWidget(self.cleanup_button)
+        self.retry_button = QPushButton(objectName="secondary")
+        self.retry_button.hide()
+        self.retry_button.clicked.connect(self.retry_failed_import)
+        open_row.addWidget(self.retry_button)
         open_row.addStretch(1)
         layout.addWidget(self.open_spacing)
         layout.addLayout(open_row)
@@ -880,6 +903,9 @@ class OxfordToNotionWindow(QMainWindow):
         self.word_entry.setPlaceholderText(text("word_placeholder"))
         self.import_button.setText(text("import"))
         self.open_button.setText(text("open_notion"))
+        self.cleanup_button.setText(text("retry_cleanup"))
+        self.retry_button.setText(text("retry_import"))
+        self.batch_button.setText(text("batch_import"))
         self.history_title.setText(text("recently_imported"))
         self.recent_title_label.setText(text("recently_imported"))
         self.recent_subtitle_label.setText(text("recent_subtitle"))
@@ -987,17 +1013,24 @@ class OxfordToNotionWindow(QMainWindow):
 
     @Slot()
     def start_import(self) -> None:
+        if self._import_busy:
+            return
         word = self.word_entry.text().strip()
         if not word:
             self.set_status_key("enter_word", "#b91c1c")
             return
         self.current_page_url = ""
+        self._active_word = word
+        self._import_stage = "stage_oxford"
+        self.retry_button.hide()
+        self.cleanup_button.hide()
         self.open_button.hide()
         self.open_spacing.hide()
         self.set_busy(True)
         self.import_button.setText(self.translator.text("importing"))
         self.set_status_key("querying", "#64748b", word=word)
         worker = ImportWorker(word, self.import_func)
+        worker.signals.progress.connect(self.show_import_progress)
         worker.signals.succeeded.connect(self.finish_success)
         worker.signals.failed.connect(self.finish_error)
         self.thread_pool.start(worker)
@@ -1015,6 +1048,10 @@ class OxfordToNotionWindow(QMainWindow):
         else:
             self.set_status_key("import_success", "#15803d", success=True, word=result.word)
         self.open_spacing.show()
+        self._cleanup_retry = getattr(result, "cleanup_retry", None)
+        self.cleanup_button.setVisible(self._cleanup_retry is not None)
+        if self._cleanup_retry is not None:
+            self.set_status_key("saved_cleanup_failed", "#b45309")
         self.open_button.show()
         try:
             items = self.history_adder(result.word, result.page_url, result.oxford_url)
@@ -1034,8 +1071,25 @@ class OxfordToNotionWindow(QMainWindow):
     @Slot(str)
     def finish_error(self, message: str) -> None:
         self.set_ready()
-        self.set_error_status(message)
+        self._failed_word = self._active_word
+        self.retry_button.setVisible(bool(self._failed_word))
+        self.set_status_key("import_failed_stage", "#b91c1c", stage=self.translator.text(self._import_stage), error=localize_error(message, self.translator))
         self.word_entry.setFocus()
+
+    def retry_failed_import(self):
+        if self._import_busy or not self._failed_word:
+            return
+        self.word_entry.setText(self._failed_word)
+        self.start_import()
+
+    def open_batch_import(self):
+        if self._import_busy:
+            return
+        if self._batch_dialog is None:
+            from batch_import import BatchImportDialog
+            self._batch_dialog = BatchImportDialog(self)
+        self._batch_dialog.show()
+        self._batch_dialog.raise_()
 
     def set_ready(self) -> None:
         self.set_busy(False)
@@ -1045,7 +1099,34 @@ class OxfordToNotionWindow(QMainWindow):
         self._import_busy = busy
         self.word_entry.setEnabled(not busy)
         self.import_button.setEnabled(not busy)
+        self.cleanup_button.setEnabled(not busy)
+        self.retry_button.setEnabled(not busy)
+        self.batch_button.setEnabled(not busy)
         self.render_update_state()
+
+    @Slot(str, object)
+    def show_import_progress(self, stage, values):
+        self._import_stage = "stage_oxford" if stage == "stage_retry" else stage
+        if not self._close_pending:
+            self.set_status_key(stage, "#64748b", **values)
+
+    @Slot()
+    def retry_cleanup(self):
+        if self._import_busy or self._cleanup_retry is None:
+            return
+        callback = self._cleanup_retry
+        self.set_busy(True)
+        self.set_status_key("stage_cleanup", "#64748b")
+        worker = ImportWorker("", lambda _word: callback())
+        worker.signals.succeeded.connect(self.finish_success)
+        worker.signals.failed.connect(self.finish_cleanup_error)
+        self.thread_pool.start(worker)
+
+    def finish_cleanup_error(self, message):
+        self.set_ready()
+        self.set_error_status(message)
+        self.retry_button.hide()
+        self.cleanup_button.show()
 
     def set_status_key(self, key: str, color: str, *, success: bool = False, **values: object) -> None:
         self._status_key = key
@@ -1099,6 +1180,10 @@ class OxfordToNotionWindow(QMainWindow):
             self, self.translator.text("reimport_word"),
             self.translator.text("reimport_explanation"),
         ))
+        for key, url in (("history_open_oxford", item.oxford_url or build_oxford_search_url(item.word)),
+                         ("history_open_notion", item.page_url)):
+            action = menu.addAction(self.translator.text(key))
+            action.triggered.connect(lambda _checked=False, target=url: self.open_external_url(target))
         menu.aboutToHide.connect(menu.deleteLater)
         return menu
 
@@ -1157,6 +1242,8 @@ class OxfordToNotionWindow(QMainWindow):
         self.recent_layout.addStretch(1)
 
     def start_recent_sync(self, *, force: bool = False) -> None:
+        if self._close_pending:
+            return
         if not self.enable_recent_sync:
             return
         if self._recent_sync_running:
@@ -1352,9 +1439,12 @@ class OxfordToNotionWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.downloaded_update_path.parent)))
 
     def closeEvent(self, event) -> None:
-        if self._update_running or self._download_running:
+        if self._update_running or self._download_running or self._import_busy or self._recent_sync_running:
             self._close_pending = True
             self._download_cancel.set()
+            self.set_status_key("closing_wait", "#64748b")
+            self.show_main_page()
+            QTimer.singleShot(250, self.close)
             event.ignore()
             return
         super().closeEvent(event)

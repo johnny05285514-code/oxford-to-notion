@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import Any
 from threading import Lock
@@ -26,6 +26,7 @@ class ImportResult:
     page_url: str
     oxford_url: str
     timing: ImportTiming | None = None
+    cleanup_retry: Callable | None = None
 
 
 class DependencyCache:
@@ -53,9 +54,26 @@ class DependencyCache:
                 self.key = key
             yield self.value
 
-    def import_word(self, word):
+    def import_word(self, word, progress=None):
         with self.acquire() as (oxford, notion):
-            return import_word(word, oxford=oxford, notion=notion)
+            oxford.progress = notion.progress = progress or (lambda _stage, **_values: None)
+            try:
+                result = import_word(word, oxford=oxford, notion=notion)
+            finally:
+                oxford.progress = notion.progress = lambda _stage, **_values: None
+            if notion.pending_cleanup:
+                key = self.key
+                pending = list(notion.pending_cleanup)
+                def retry():
+                    with self.acquire() as (_, writer):
+                        if self.key != key:
+                            raise ValueError("Notion settings changed. Restore the original settings before retrying cleanup.")
+                        writer.pending_cleanup = list(pending)
+                        writer.retry_cleanup()
+                        pending[:] = writer.pending_cleanup
+                        return replace(result, cleanup_retry=retry if pending else None)
+                result = replace(result, cleanup_retry=retry)
+            return result
 
     def list_recent(self):
         with self.acquire() as (_, notion):

@@ -49,6 +49,7 @@ class OxfordClient:
         self.timeout = timeout
         self.max_attempts = max(1, max_attempts)
         self.sleep = sleep
+        self.progress = lambda _stage, **_values: None
         self.session.headers.update(
             {
                 "User-Agent": "Oxford-to-Notion/1.5.1 (+low-frequency personal use)",
@@ -65,6 +66,7 @@ class OxfordClient:
 
         for url_index, url in enumerate(urls):
             for attempt in range(self.max_attempts):
+                self.progress("stage_oxford" if attempt == 0 else "stage_retry", attempt=attempt + 1, total=self.max_attempts)
                 try:
                     response = self.session.get(url, timeout=self.timeout)
                 except requests.RequestException as exc:

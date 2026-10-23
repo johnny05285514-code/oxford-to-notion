@@ -115,6 +115,8 @@ class NotionWriter:
         self.cache_clock = cache_clock
         self._schema_cache = None
         self._schema_cached_at = 0.0
+        self.pending_cleanup = []
+        self.progress = lambda _stage, **_values: None
 
     def validate_connection(self) -> str:
         """Validate database access and schema without writing any data."""
@@ -201,6 +203,8 @@ class NotionWriter:
 
     def upsert(self, entry: WordEntry) -> str:
         self.last_timing = None
+        self.pending_cleanup = []
+        self.progress("stage_notion")
         started_at = self.clock()
         try:
             data_source_id, schema = self._resolve_data_source()
@@ -213,10 +217,14 @@ class NotionWriter:
             ).get("results", [])
             checked_at = self.clock()
             blocks = build_blocks(entry)
+            self.progress("stage_save")
             if existing:
                 page = existing[0]
                 old_managed_ids = self._managed_child_ids(page["id"])
-                new_managed_id = self._append_managed_container(page["id"], blocks)
+                unchanged = len(old_managed_ids) == 1 and self._same_content(
+                    self._list_children(old_managed_ids[0]), blocks
+                )
+                new_managed_id = old_managed_ids[0] if unchanged else self._append_managed_container(page["id"], blocks)
                 try:
                     updated = self.client.pages.update(
                         page_id=page["id"],
@@ -224,13 +232,13 @@ class NotionWriter:
                     )
                 except Exception:
                     try:
-                        self.client.blocks.delete(block_id=new_managed_id)
+                        if not unchanged:
+                            self.client.blocks.delete(block_id=new_managed_id)
                     except Exception:
                         pass
                     raise
-                for block_id in old_managed_ids:
-                    if block_id != new_managed_id:
-                        self.client.blocks.delete(block_id=block_id)
+                self.pending_cleanup = [block_id for block_id in old_managed_ids if block_id != new_managed_id]
+                self.retry_cleanup()
                 page_url = updated.get("url") or page.get("url") or page["id"]
 
             else:
@@ -291,6 +299,24 @@ class NotionWriter:
                 problems.append(f"{name} (expected {expected_type}, got {actual or 'missing'})")
         if problems:
             raise NotionSchemaError("Notion database schema mismatch: " + "; ".join(problems))
+
+    def retry_cleanup(self):
+        remaining = []
+        for block_id in self.pending_cleanup:
+            try:
+                self.client.blocks.delete(block_id=block_id)
+            except (APIResponseError, HTTPResponseError, RequestTimeoutError, httpx.RequestError, OSError):
+                remaining.append(block_id)
+        self.pending_cleanup = remaining
+
+    @classmethod
+    def _same_content(cls, current, desired):
+        return len(current) == len(desired) and all(
+            old.get("type") == new.get("type")
+            and not old.get("has_children")
+            and cls._block_text(old) == cls._block_text(new)
+            for old, new in zip(current, desired)
+        )
 
     def _list_children(self, block_id: str) -> list[dict[str, Any]]:
         blocks: list[dict[str, Any]] = []

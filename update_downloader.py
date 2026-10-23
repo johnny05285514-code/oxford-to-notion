@@ -37,6 +37,28 @@ def cleanup_partial_downloads(cache_dir: Path) -> None:
         pass
 
 
+def cleanup_old_packages(cache_dir: Path, current_version: str) -> None:
+    """Keep this app version's package plus the newest older cached version."""
+    try:
+        current = tuple(map(int, current_version.split('.')))
+        package = re.compile(r'Oxford-to-Notion-(?:Setup-\d+\.\d+\.\d+\.exe|macOS-arm64\.dmg)')
+        older = sorted((p for p in cache_dir.iterdir()
+                        if not p.is_symlink() and p.is_dir()
+                        and re.fullmatch(r'\d+\.\d+\.\d+', p.name)
+                        and tuple(map(int, p.name.split('.'))) < current
+                        and any(not f.is_symlink() and f.is_file() and package.fullmatch(f.name)
+                                for f in p.iterdir())),
+                       key=lambda p: tuple(map(int, p.name.split('.'))), reverse=True)
+        for folder in older[1:]:
+            for path in folder.iterdir():
+                if not path.is_symlink() and path.is_file() and re.fullmatch(
+                    r'Oxford-to-Notion-(?:Setup-\d+\.\d+\.\d+\.exe|macOS-arm64\.dmg)(?:\.sha256)?', path.name
+                ):
+                    path.unlink()
+    except OSError:
+        pass
+
+
 def _redirect_url(url: str) -> bool:
     try:
         parsed = urlsplit(url)

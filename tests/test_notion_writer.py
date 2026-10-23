@@ -315,6 +315,33 @@ def test_repeat_import_replaces_only_the_old_managed_container():
     assert deleted_ids == {"old-managed"}
 
 
+def test_saved_content_survives_cleanup_failure_and_retry_only_deletes():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children.responses["list"] = {"results": [_managed_toggle("old-managed")]}
+    _configure_managed_append(client)
+    client.blocks.responses["delete"] = RequestTimeoutError()
+    writer = NotionWriter(client, "database-id")
+    assert writer.upsert(ENTRY) == "https://notion/existing"
+    assert writer.pending_cleanup == ["old-managed"]
+    writes = len(client.pages.calls), len(client.blocks.children.calls)
+    client.blocks.responses["delete"] = {}
+    writer.retry_cleanup()
+    assert writer.pending_cleanup == []
+    assert (len(client.pages.calls), len(client.blocks.children.calls)) == writes
+
+
+def test_unchanged_body_updates_properties_without_replacing_blocks():
+    client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
+    client.blocks.children.responses["list"] = lambda **kw: {
+        "results": build_blocks(ENTRY) if kw["block_id"] == "old-managed" else [_managed_toggle("old-managed")]
+    }
+    writer = NotionWriter(client, "database-id")
+    assert writer.upsert(ENTRY) == "https://notion/existing"
+    assert not any(name == "append" for name, _ in client.blocks.children.calls)
+    assert not any(name == "delete" for name, _ in client.blocks.calls)
+    assert any(name == "update" for name, _ in client.pages.calls)
+
+
 def test_failed_replacement_keeps_old_managed_content():
     client = FakeClient([{"id": "existing-page", "url": "https://notion/existing"}])
     client.blocks.children = Endpoint(

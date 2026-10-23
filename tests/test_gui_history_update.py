@@ -83,9 +83,133 @@ def test_reimport_uses_existing_import_flow_and_ignores_busy(monkeypatch):
 def test_history_menu_has_reimport_and_explanation(monkeypatch):
     _app, window, _saved = make_window(monkeypatch)
     menu = window.build_history_menu(item("emit"))
-    assert len(menu.actions()) == 2
+    assert len(menu.actions()) == 4
     assert "重新导入" in menu.actions()[0].text()
     assert "?" in menu.actions()[1].text()
+    window.close()
+
+
+def test_history_menu_offers_both_destinations(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    opened = []
+    monkeypatch.setattr(window, "open_external_url", opened.append)
+    menu = window.build_history_menu(item("emit", "https://notion.so/emit", "https://www.oxfordlearnersdictionaries.com/definition/english/emit"))
+    menu.actions()[2].trigger()
+    menu.actions()[3].trigger()
+    assert opened == ["https://www.oxfordlearnersdictionaries.com/definition/english/emit", "https://notion.so/emit"]
+    window.close()
+
+
+def test_failed_import_retries_original_word_with_stage(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    pool = HoldingThreadPool()
+    monkeypatch.setattr(window, "thread_pool", pool)
+    window.word_entry.setText("emit")
+    window.start_import()
+    window.show_import_progress("stage_save", {})
+    window.finish_error("offline")
+    assert "保存" in window.status_label.text()
+    window.word_entry.setText("something else")
+    window.retry_failed_import()
+    assert pool.jobs[-1].word == "emit"
+    window.set_busy(False)
+    window.close()
+
+
+def test_batch_continues_after_failure_and_retries_only_failed_row(monkeypatch):
+    from batch_import import BatchImportDialog
+    _app, window, _saved = make_window(monkeypatch)
+    pool = HoldingThreadPool()
+    monkeypatch.setattr(window, "thread_pool", pool)
+    calls = []
+    def importer(word):
+        calls.append(word)
+        if word == "bad" and calls.count("bad") == 1:
+            raise ValueError("offline")
+        return ImportResult(word, "https://notion.so/" + word, "https://example.test/" + word)
+    window.import_func = importer
+    dialog = BatchImportDialog(window)
+    dialog.entry.setPlainText("good,bad\nlast")
+    dialog.start_batch()
+    assert len(pool.jobs) == 1
+    pool.jobs[0].run()
+    pool.jobs[1].run()
+    pool.jobs[2].run()
+    assert calls == ["good", "bad", "last"]
+    assert not dialog.busy
+    dialog.retry(1)
+    pool.jobs[3].run()
+    assert calls == ["good", "bad", "last", "bad"]
+    assert not dialog.busy
+    dialog.close()
+    window.close()
+
+
+def test_batch_real_worker_queue_finishes_and_unlocks_ui(monkeypatch):
+    import time
+    from batch_import import BatchImportDialog
+    app, window, _saved = make_window(monkeypatch)
+    calls = []
+    def importer(word):
+        calls.append(word)
+        return ImportResult(word, "https://notion.so/" + word, "https://example.test/" + word)
+    window.import_func = importer
+    dialog = BatchImportDialog(window)
+    dialog.entry.setPlainText("one\ntwo")
+    dialog.start_batch()
+    deadline = time.monotonic() + 5
+    while dialog.busy and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.005)
+    assert not dialog.busy
+    assert calls == ["one", "two"]
+    assert window.import_button.isEnabled()
+    window.thread_pool.waitForDone()
+    dialog.close()
+    window.close()
+
+
+def test_partial_success_has_cleanup_only_action(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    pool = HoldingThreadPool()
+    monkeypatch.setattr(window, "thread_pool", pool)
+    calls = []
+    clean = ImportResult("emit", "https://notion.so/emit", "https://example.test/emit")
+    partial = ImportResult("emit", clean.page_url, clean.oxford_url,
+                           cleanup_retry=lambda: calls.append("cleanup") or clean)
+    window.finish_success(partial)
+    assert not window.cleanup_button.isHidden()
+    assert "已保存" in window.status_label.text()
+    window.retry_cleanup()
+    assert window._import_busy
+    pool.jobs[0].run()
+    assert calls == ["cleanup"]
+    assert window.cleanup_button.isHidden()
+    window.close()
+
+
+def test_close_waits_for_import_and_sync(monkeypatch):
+    from PySide6.QtGui import QCloseEvent
+    _app, window, _saved = make_window(monkeypatch)
+    monkeypatch.setattr(gui.QTimer, "singleShot", lambda *_args: None)
+    for attribute in ["_import_busy", "_recent_sync_running"]:
+        setattr(window, attribute, True)
+        event = QCloseEvent()
+        window.closeEvent(event)
+        assert not event.isAccepted()
+        assert "等待" in window.status_label.text()
+        setattr(window, attribute, False)
+    event = QCloseEvent()
+    window.closeEvent(event)
+    assert event.isAccepted()
+    window.close()
+
+
+def test_real_progress_text_is_localized(monkeypatch):
+    _app, window, _saved = make_window(monkeypatch)
+    window.show_import_progress("stage_retry", {"attempt": 2, "total": 3})
+    assert "2/3" in window.status_label.text()
+    assert "重试" in window.status_label.text()
     window.close()
 
 

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### v1.6.0
+
+- 单词导入失败后显示失败阶段，并支持重试原单词。
+- 历史词条菜单同时提供 Oxford 和 Notion 打开入口。
+- 新增每批最多 20 个词的逐个导入窗口，支持换行、逗号、分号分隔及失败项单独重试。
+- Failed imports retain their word and show the failure stage with a retry action.
+- History menus offer both Oxford and Notion destinations.
+- Batch import processes up to 20 words sequentially, with per-word results and retries.
+
+- 区分“已保存但旧内容清理失败”，提供仅重试清理的按钮；重试不重新查询 Oxford 或重写正文。
+- 显示真实的查询、重试、检查和保存阶段；关闭窗口时等待导入及历史同步结束。
+- 词典正文未变化时跳过正文替换，仍更新词条属性。
+- 启动时清理较旧的完整安装包缓存，保留当前版本、最近一个旧安装包及未来版本。
+- Distinguish successful saves with incomplete cleanup and offer cleanup-only retries.
+- Show actual import stages and retry counts; wait for imports and history sync before closing.
+- Skip unchanged dictionary body replacements while updating entry properties.
+- Retain the current, latest older, and future update packages when pruning old cached installers.
+
 ### v1.5.7
 
 - Windows 安装器先解压验证新版，再备份并替换程序文件；替换失败时尝试恢复旧文件，个人配置不参与替换。
